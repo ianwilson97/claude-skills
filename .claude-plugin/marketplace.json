@@ -5,7 +5,7 @@
   "plugins": {
     "learning-mode": {
       "source": "github",
-      "id": "YOUR_GITHUB_USERNAME/claude-skills",
+      "id": "ianwilson97/claude-skills",
       "path": "plugins/learning-mode"
     }
   }
