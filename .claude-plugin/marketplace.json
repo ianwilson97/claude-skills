@@ -2,11 +2,14 @@
   "name": "claude-skills",
   "displayName": "Ian's Claude Skills",
   "description": "Personal collection of Claude Code skills",
-  "plugins": {
-    "learning-mode": {
-      "source": "github",
-      "id": "ianwilson97/claude-skills",
-      "path": "plugins/learning-mode"
+  "owner": {
+    "name": "Ian Wilson"
+  },
+  "plugins": [
+    {
+      "name": "learning-mode",
+      "source": "./plugins/learning-mode",
+      "description": "Teaching-first skill — helps the user understand deeply rather than handing them finished code"
     }
-  }
+  ]
 }
