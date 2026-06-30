@@ -1,0 +1,12 @@
+{
+  "name": "claude-skills",
+  "displayName": "Ian's Claude Skills",
+  "description": "Personal collection of Claude Code skills",
+  "plugins": {
+    "learning-mode": {
+      "source": "github",
+      "id": "YOUR_GITHUB_USERNAME/claude-skills",
+      "path": "plugins/learning-mode"
+    }
+  }
+}
