@@ -10,6 +10,11 @@
       "name": "learning-mode",
       "source": "./plugins/learning-mode",
       "description": "Teaching-first skill — helps the user understand deeply rather than handing them finished code"
+    },
+    {
+      "name": "research",
+      "source": "./plugins/research",
+      "description": "Answer technical questions by reading current official documentation and citing precise sources"
     }
   ]
 }

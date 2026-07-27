@@ -1,0 +1,23 @@
+{
+  "skill_name": "learning-mode",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "I'm working through a Python course and I want to actually understand decorators, not just copy them. Can you help me write a decorator that times how long my functions take to run?",
+      "expected_output": "Reference-doc-style explanation of decorators: concept, how they work (functions returning functions, closures over the wrapped fn), an analogous example that is NOT the timing decorator (e.g. a logging or call-counting decorator), gotchas (functools.wraps, args/kwargs), an exercise telling the user to write the timing decorator themselves, and links to official Python docs. Should NOT hand over the finished timing decorator.",
+      "files": []
+    },
+    {
+      "id": 1,
+      "prompt": "Teaching myself React hooks. I have a component that subscribes to a websocket in useEffect and I keep getting duplicate connections. I want to understand how the cleanup function works so I can fix it myself.",
+      "expected_output": "Should web-search current React docs (useEffect cleanup, effects with subscriptions, React 18 StrictMode double-invoke). Explains the cleanup mechanism and WHY duplicate connections happen. Analogous example with a non-websocket subscription (e.g. setInterval or an event listener). Gotchas around StrictMode and dependency arrays. Exercise: user writes the websocket cleanup. Links to react.dev. Does not write the user's exact websocket effect.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "I'm learning Rust and this won't compile: I have a vector, I take a reference to its first element, then I push to the vector, then I try to print the reference. The compiler yells about borrowing. I want to understand the borrow checker rule here, not just make the error go away.",
+      "expected_output": "Explains the borrow rule (can't have a mutable borrow while an immutable borrow is live; push needs &mut, the reference is an &). Mental model of why (reallocation could invalidate the reference). Analogous example showing the same aliasing rule on a different operation. Names the relevant concept/terms so the user can search. Points to the Rust book / official docs. Guides the user to the fix rather than just rewriting their code.",
+      "files": []
+    }
+  ]
+}

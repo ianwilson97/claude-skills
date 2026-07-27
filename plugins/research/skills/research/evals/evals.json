@@ -1,0 +1,136 @@
+{
+  "skill_name": "research",
+  "evals": [
+    {
+      "id": 0,
+      "name": "api-behavior-lookup",
+      "prompt": "does tokio's spawn_blocking have a thread limit? hitting weird stalls in my worker pool where tasks just sit there for like 30s before running",
+      "expected_output": "Direct answer that spawn_blocking uses a bounded blocking-thread pool (default max 512, configurable via max_blocking_threads), citing the official tokio docs with a deep link + quoted line. Should connect the limit to the observed stall symptom.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "a1",
+          "text": "Cites at least one official source (docs.rs/tokio.rs/github.com/tokio-rs)"
+        },
+        {
+          "id": "a2",
+          "text": "Includes at least one verbatim quoted line from a source, not just a paraphrase"
+        },
+        {
+          "id": "a3",
+          "text": "Cited URLs deep-link to a section/anchor or specific page, not a site root"
+        },
+        {
+          "id": "a4",
+          "text": "No links to disallowed sources (w3schools, geeksforgeeks, medium, tutorialspoint); any Stack Overflow link is explicitly labeled as a lower-confidence community fallback"
+        },
+        {
+          "id": "a5",
+          "text": "Opens with the direct answer, not a preamble or a plan of what it will do"
+        },
+        {
+          "id": "a6",
+          "text": "States the actual default blocking-thread cap (512) and names the max_blocking_threads builder option"
+        },
+        {
+          "id": "a7",
+          "text": "Connects the thread cap to the user's reported symptom (tasks queueing/stalling ~30s), rather than answering the API question in isolation"
+        },
+        {
+          "id": "a8",
+          "text": "Archive file written with question/date/stack frontmatter (with_skill runs only)"
+        }
+      ]
+    },
+    {
+      "id": 1,
+      "name": "spec-rfc-semantics",
+      "prompt": "whats the actual difference between 409 and 422, my api returns 409 for validation errors and a reviewer flagged it",
+      "expected_output": "Answer grounded in RFC 9110 (409) and RFC 4918 (422), with section-level deep links and verbatim quoted definitions. Should confirm the reviewer is right and say which code to use for validation failures.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "a1",
+          "text": "Cites at least one official source (rfc-editor.org / ietf.org / httpwg.org / MDN)"
+        },
+        {
+          "id": "a2",
+          "text": "Includes at least one verbatim quoted line from a source, not just a paraphrase"
+        },
+        {
+          "id": "a3",
+          "text": "Cited URLs deep-link to a section/anchor or specific page, not a site root"
+        },
+        {
+          "id": "a4",
+          "text": "No links to disallowed sources (w3schools, geeksforgeeks, medium, tutorialspoint); any Stack Overflow link is explicitly labeled as a lower-confidence community fallback"
+        },
+        {
+          "id": "a5",
+          "text": "Opens with the direct answer, not a preamble or a plan of what it will do"
+        },
+        {
+          "id": "a6",
+          "text": "Cites RFC 9110 for 409 specifically (not the obsolete RFC 7231/2616)"
+        },
+        {
+          "id": "a7",
+          "text": "Attributes 422 to RFC 9110 (core HTTP since 2022, 'Unprocessable Content') rather than treating it as WebDAV-only legacy from RFC 4918"
+        },
+        {
+          "id": "a8",
+          "text": "Gives a clear verdict on the reviewer's flag rather than hedging both ways"
+        },
+        {
+          "id": "a9",
+          "text": "Archive file written with question/date/stack frontmatter (with_skill runs only)"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "multi-part-migration",
+      "prompt": "i need to migrate our vite config from v5 to v7, whats going to break",
+      "expected_output": "Breaking-change summary spanning both the v5->v6 and v6->v7 migration guides, citing official vite migration docs with section anchors. Should surface Node version requirements and default-behavior changes. Broad enough to justify fanning out to subagents.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "a1",
+          "text": "Cites at least one official source (vite.dev / vitejs.dev / github.com/vitejs)"
+        },
+        {
+          "id": "a2",
+          "text": "Includes at least one verbatim quoted line from a source, not just a paraphrase"
+        },
+        {
+          "id": "a3",
+          "text": "Cited URLs deep-link to a section/anchor or specific page, not a site root"
+        },
+        {
+          "id": "a4",
+          "text": "No links to disallowed sources (w3schools, geeksforgeeks, medium, tutorialspoint); any Stack Overflow link is explicitly labeled as a lower-confidence community fallback"
+        },
+        {
+          "id": "a5",
+          "text": "Opens with the direct answer, not a preamble or a plan of what it will do"
+        },
+        {
+          "id": "a6",
+          "text": "Covers BOTH migration hops (v5->v6 and v6->v7), not just one"
+        },
+        {
+          "id": "a7",
+          "text": "Names the Node.js version requirement change as a breaking item"
+        },
+        {
+          "id": "a8",
+          "text": "Flags that the user's actual current version should be confirmed from package.json/lockfile before acting"
+        },
+        {
+          "id": "a9",
+          "text": "Archive file written with question/date/stack frontmatter (with_skill runs only)"
+        }
+      ]
+    }
+  ]
+}
