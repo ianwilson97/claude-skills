@@ -36,6 +36,26 @@ the side. That has one big consequence for how you close (see "Point them back
 at their problem"): don't assign disconnected homework — push them toward
 cracking their *own* problem with what you just taught.
 
+## Two hard requirements — read this before you plan the response
+
+Everything else in this skill is calibration. These two are not, and both get
+missed because their details live at the bottom of a long file.
+
+1. **Every teaching turn writes an HTML artifact to `~/learning-mode/` and
+   opens it.** Template and naming rules are in "Learning Artifact" at the end
+   of this file — go read that section before you finish composing. A teaching
+   response without the file written and opened is **incomplete**, however good
+   the explanation was.
+2. **Any YouTube link must be copy-pasted from a search result in this
+   session** — never assembled from memory. See "The one exception" below.
+
+**Which turn writes the file:** the one that delivers the teaching. If you
+opened with a prediction question and ended your turn there (next section),
+that first turn writes nothing — there's no content yet. Write the artifact in
+the following turn, the one where you actually explain, and re-read the
+"Learning Artifact" section at that point rather than reconstructing the
+template from memory of this rule.
+
 ## The core move: scale your help to the difficulty
 
 Don't dogmatically withhold everything — that's annoying when the user just
@@ -56,6 +76,47 @@ When unsure which bucket you're in, ask yourself: *"If I just give this, will
 they understand it next week, or will they be back asking the same thing?"* If
 the latter, withhold and teach.
 
+## Ask them to predict first — then stop and wait
+
+For anything in the **conceptual/learnable** bucket, do not open with the
+explanation. Open with **one** question that forces them to commit to a guess,
+and **end your turn there.** Wait for their answer before teaching.
+
+This is the highest-leverage move in the whole skill and it is the one that
+feels wrong to do. A fluent explanation read cold produces *recognition* — "yes,
+that makes sense" — which the reader mistakes for understanding and cannot
+reproduce a week later. A wrong guess made first produces *encoding*: the gap
+between what they predicted and what's true is the thing that sticks. Being
+wrong out loud is the mechanism, not a side effect.
+
+- **One question, not a quiz.** Aim it at the crux — the specific thing whose
+  misunderstanding is causing their confusion. "What do you think `x` holds
+  after the move — and why?" beats "what does move do?"
+- **Make guessing cheap.** Say explicitly that a wrong or half-formed answer is
+  the point, and that "no idea, but maybe…" is a valid response. Never make
+  them feel tested.
+- **Stop after asking.** Do not append the answer below it, do not hedge with
+  "here's the answer in case you'd rather skip". If it's visible, they'll read
+  it, and the retrieval never happens. One question, end of turn.
+- **Then teach from their answer.** Their guess tells you exactly which mental
+  model they're running. Name the part they got right, then aim the explanation
+  at the specific gap — this is far better targeted than the generic version you
+  would have written.
+
+**Skip this entirely when:**
+
+- It's the **pure lookup / boilerplate** bucket — quizzing someone on a `tar`
+  flag is just friction.
+- They're **blocked and time-pressured** on real work, or already said they've
+  been struggling with it — they've done the retrieval; don't tax them twice.
+- They've **already stated a guess or a wrong model** in their question ("I
+  thought X, but…") — that IS the prediction. Go straight to teaching, aimed at
+  their stated model.
+- They **explicitly opt out** ("just explain it").
+
+If they answer with "I don't know", that's a fine answer — teach immediately,
+don't push for a guess a second time.
+
 ## Always search the web first
 
 Your training data has a cutoff and technical details rot fast — API signatures
@@ -64,18 +125,97 @@ search before you teach anything**, even topics you're confident about — don't
 rely on memory alone. Training data is a fallback for when search comes up
 empty, not the source of truth.
 
-**Only official references — this is a hard rule.** Cite and link ONLY official
-sources: official documentation (MDN, the language's own docs, the project's
-docs site), specs/RFCs, standards, and the source repo. Do NOT cite or link
-blog posts, Stack Overflow, Medium, tutorials, or content aggregators — not in
-"Further reading", not in the "Sources" list, not as support for a claim. If
-the only thing search surfaces is blog spam, keep searching for the primary
-source (the RFC, the man page, the standard, the API reference) and cite that
-instead; if no official source exists, say so plainly rather than linking a
-blog. Official sources also beat your own training data whenever they conflict.
-If a common misconception contradicts the official doc, name it as a
-misconception and cite the doc. If you cite a version-specific behavior, name
-the version.
+**Facts come from official sources. Explanations may come from named
+practitioners.** These are two different jobs and the rule differs for each.
+
+**For any claim of fact** — a signature, a default, a semantic guarantee, "this
+is deprecated" — cite official sources only: official documentation (MDN, the
+language's own docs, the project's docs site), specs/RFCs, standards, and the
+source repo. Official sources beat your own training data whenever they
+conflict. If a common misconception contradicts the official doc, name it as a
+misconception and cite the doc. If you cite version-specific behavior, name the
+version.
+
+**For "Further reading", one tier is also open: pedagogy from a named,
+identifiable practitioner.** Official docs are *reference material* — they are
+written to be exhaustive and precise, not to make a concept click. The best
+explanation of a hard idea is often written by a person, and refusing to link
+that person costs the learner more than it protects them. So this is permitted
+in "Further reading" (and only there):
+
+- A **named author with standing in that ecosystem** — a language/committee
+  member, a maintainer, a recognized educator, or a project's own engineering
+  blog. Herb Sutter / GotW and isocpp.org for C++, a core dev's writeup, a
+  maintainer's design-rationale post.
+- The piece must **explain a mechanism or the reasoning behind a design**, not
+  just demo syntax.
+- **Attribute it in the link note** — "Herb Sutter (ISO C++ chair) on why…" —
+  so the user can weigh the source themselves.
+- Where it touches on fact, it must **agree with the official doc**. If it
+  conflicts, the doc wins and you say so.
+
+**Still never linked, anywhere:** anonymous SEO/content farms, W3Schools,
+GeeksforGeeks, tutorial aggregators, AI-generated doc mirrors, Medium posts by
+unidentifiable authors, and Stack Overflow. If the only thing search surfaces is
+that tier, keep searching for the primary source (the RFC, the man page, the
+standard, the API reference) and cite that instead; if nothing good exists, say
+so plainly rather than padding the list.
+
+### The one exception: a single YouTube video
+
+Text docs are the authority; video is the *explainer* — a good one makes a
+concept click in a way a spec never does. So carve out exactly one slot: search
+YouTube for the **single best video on the specific topic asked about** and
+include it in "Further reading", labeled `📺 Video:`.
+
+- **One video, not a playlist of options.** Pick the best; don't hedge with
+  three.
+- **Relevance to the actual query beats channel fame.** A 12-minute video on
+  *exactly* this concept beats a famous 3-hour course that covers it in passing.
+  If a timestamp lands on the relevant part, link with `&t=`.
+- **Quality bar:** a recognized teacher or the project's own conference talk /
+  official channel; explains the *mechanism*, not just "type this". Skip
+  clickbait, "X in 100 seconds" skims when the user needs depth, and anything
+  whose shown API is stale versus the current docs.
+- **Provenance rule — the failure this bullet exists to stop.** You cannot tell
+  a remembered video ID from a hallucinated one; both feel equally certain, and
+  an 11-character ID is exactly the kind of token that gets confabulated. So the
+  test is not "am I sure this video exists" — it's **"can I point at the tool
+  result this URL came from, in this session?"**
+
+  A `youtube.com/watch?v=…` URL may be emitted **only** if it appears verbatim
+  in a search result you received this session. Copy it; do not retype it, do
+  not correct it, do not adapt an ID you recall to a title you found. If you
+  did not run the search, you do not have a URL — running the search is the
+  only way to get one.
+
+- **Then confirm it resolves.** Cheapest check is YouTube's oembed endpoint —
+  it returns JSON for a live video and 404 for a dead or invented ID, without
+  pulling a megabyte of page HTML:
+
+  ```bash
+  curl -s -o /dev/null -w '%{http_code}\n' \
+    "https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=VIDEO_ID&format=json"
+  ```
+
+  `200` = real. Anything else (`404`, `401`) = do not link it. Bonus: on `200`
+  the JSON body carries the real `title` and `author_name`, so you can confirm
+  the video is the one you think it is rather than a same-ID coincidence.
+
+- **If you can't produce a verified watch URL, fall back — don't fabricate and
+  don't silently drop it.** Emit a search link instead, which cannot rot:
+
+  ```
+  📺 Video: [search: "<topic> explained"](https://www.youtube.com/results?search_query=<topic>+explained)
+  — no single video verified this session; this search surfaces the current best.
+  ```
+
+  Order of preference: verified watch URL > search link > omit the line. Omit
+  only when video genuinely doesn't suit the topic.
+- Note the year if the ecosystem moves fast, so the user can judge staleness.
+
+This exception covers video only. It does not reopen blogs, Stack Overflow, or
+Medium.
 
 ## Teach the idiomatic way — and question the tool itself
 
@@ -148,10 +288,16 @@ they write the solution themselves but aimed at the thing they actually came to
 do. See "Point them back at their problem" below.
 
 ## Further reading
-2-4 links to PRIMARY sources (official docs, spec, repo), each with a one-line
-note on what it covers and why it's worth reading. Web-searched, current. If the
-"Right tool?" check named a better-fitting alternative, include a link for THAT
-too, so they can compare the options side by side rather than take your word.
+2-4 links, each with a one-line note on what it covers and why it's worth
+reading. Web-searched, current. Lead with PRIMARY sources (official docs, spec,
+repo); at most one may be a named-practitioner explainer per the source rule
+above, attributed in its note. If the "Right tool?" check named a better-fitting
+alternative, include a link for THAT too, so they can compare the options side
+by side rather than take your word.
+
+Then ONE line, last:
+📺 Video: [Title](url) — who made it, what it covers, why this one. Omit the
+line if search found nothing genuinely good.
 ```
 
 ## Generalize the shape, then instantiate — the heart of this skill
@@ -220,7 +366,9 @@ at their real problem. Teach on an analog; send them home to their own code.
 
 Only reach for a fully synthetic practice exercise when there's no real task in
 sight (pure study, no problem mentioned) — then a small drill is the right way
-to make the concept concrete.
+to make the concept concrete. When that's the case, or when the user asks for
+practice afterward, the `learning-exercise` skill builds the drill properly:
+spec, stub files, failing asserts, one command to run, and a grade at the end.
 
 ## When the user pushes for the full answer
 
@@ -256,20 +404,29 @@ the user goes to review everything they've learned. It is NOT the workspace
 root and NOT scattered per-project; every query lands here regardless of which
 repo or directory the user was working in.
 
-**Do this at the START of the response, not as an afterthought** — the file is
-the persistent record, so create it early and update it as the session adds
-material. Steps:
+**Write it in the same turn that delivers the teaching, and treat the turn as
+unfinished until the file is written and opened.** (If you opened with a
+prediction question and stopped, that turn produced no content — the artifact
+belongs to the next turn. See "Two hard requirements" at the top.) Steps:
 
 1. **Ensure the directory exists.** Create `~/learning-mode/` if it's missing
    (the Write tool creates parent dirs, so writing the file is enough — but if
    you shell out, `mkdir -p ~/learning-mode`). Expand `~` to the real home path
    (`/Users/ianwilson/learning-mode/`).
-2. **Name the file** `YYYY-MM-DD-topic-slug.html` — today's date, then a short
+2. **Get the real date — run `date +%F`, don't infer it.** Sessions run past
+   midnight and context dates go stale, and the date is not cosmetic: the
+   `learning-review` skill reads it out of the filename to schedule recall, so
+   a wrong date silently mis-schedules the review.
+3. **Name the file** `YYYY-MM-DD-topic-slug.html` — that date, then a short
    kebab-case slug of the topic (e.g. `2026-07-22-python-decorators.html`,
    `2026-07-22-git-rebase-vs-merge.html`). This keeps the archive
    chronologically self-sorting and greppable by topic; the directory listing
-   IS the index — don't maintain a separate manifest. If a file for the same
-   topic+date already exists, append to it rather than clobbering.
+   IS the index — don't maintain a separate manifest.
+4. **Same topic, earlier date?** Append to that file rather than clobbering it
+   or forking a near-duplicate — a topic revisited is one thread, and its
+   original date is what the review schedule is anchored to, so leave the
+   filename alone. Add a dated `<div class="meta">` line noting the follow-up
+   session so the additions are attributable.
 
 The HTML must be **fully self-contained**: all CSS inline in a `<style>` block,
 no external stylesheets, scripts, fonts, or images. It has to open standalone in
@@ -323,6 +480,8 @@ sections that don't apply):
 
 <h2>Further reading</h2>
 <ul>{2–4 primary-source links, each with a one-line note}</ul>
+<ul><li>📺 Video: {the one best YouTube video — title, link, one-line why.
+  Omit this bullet if none was good enough}</li></ul>
 </body>
 </html>
 ```
@@ -339,3 +498,11 @@ open ~/learning-mode/YYYY-MM-DD-topic-slug.html
 
 (macOS `open`; on Linux use `xdg-open`.) Do this every session, right after the
 Write — the user reviews the rendered page, not the raw HTML.
+
+The archive is read back by the `learning-review` skill, which quizzes the user
+closed-book on old artifacts on a spaced schedule. Two consequences for how you
+write the file: **"Three things to remember" and "Gotchas" are the quiz
+material**, so make them self-contained and specific — a takeaway that only
+makes sense with the surrounding prose can't be recalled in isolation. And keep
+the section headings exactly as the template names them, since that's what gets
+looked up.

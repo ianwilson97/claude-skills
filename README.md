@@ -4,10 +4,18 @@ Personal collection of Claude Code skills distributed as a plugin marketplace.
 
 ## Skills
 
-### learning-mode
+### learning-mode (plugin)
 
-Teaching-first approach: Claude explains concepts deeply and helps you write the
-solution yourself instead of handing over finished code.
+Three skills that cover a full learn → apply → retain loop:
+
+- **learning-mode** — teaching-first: Claude explains concepts deeply and helps
+  you write the solution yourself instead of handing over finished code. Writes
+  an HTML artifact per session to `~/learning-mode/`.
+- **learning-exercise** — generates one small runnable exercise (spec, stubs
+  with TODOs, failing tests, one-command runner) into
+  `~/learning-mode/exercises/`, then grades your attempt.
+- **learning-review** — spaced recall over past `~/learning-mode/` artifacts:
+  quizzes you closed-book, grades the gap, schedules the next review.
 
 ### research
 
@@ -19,9 +27,9 @@ citations.
 
 ```bash
 # Add the marketplace
-claude plugin marketplace add YOUR_GITHUB_USERNAME/claude-skills
+claude plugin marketplace add ianwilson97/claude-skills
 
-# Install a skill
+# Install a plugin (learning-mode brings all three learning skills)
 claude plugin install learning-mode@claude-skills
 claude plugin install research@claude-skills
 ```

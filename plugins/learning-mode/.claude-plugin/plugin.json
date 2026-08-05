@@ -1,6 +1,6 @@
 {
   "name": "learning-mode",
   "displayName": "Learning Mode",
-  "description": "Teaching-first skill — helps the user understand deeply rather than handing them finished code",
-  "version": "1.1.0"
+  "description": "Teaching-first skills — learn a topic deeply (learning-mode), drill it with a generated exercise (learning-exercise), and retain it via spaced recall (learning-review)",
+  "version": "1.2.0"
 }
