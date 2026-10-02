@@ -15,6 +15,11 @@
       "name": "research",
       "source": "./plugins/research",
       "description": "Answer technical questions by reading current official documentation and citing precise sources"
+    },
+    {
+      "name": "driver-seat",
+      "source": "./plugins/driver-seat",
+      "description": "Pair-programming mode: you write the code, Claude navigates — plans as todo files, web-searches before every claim, briefs, reviews, and takes chores"
     }
   ]
 }

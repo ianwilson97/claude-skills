@@ -23,6 +23,16 @@ Answers technical questions by reading current official documentation instead
 of relying on memory, then hands back a summary, a worked example, and precise
 citations.
 
+### driver-seat
+
+Pair-programming mode based on turion's
+[How to keep enjoying programming in a world of LLMs](https://discourse.haskell.org/t/14705).
+You are the driver and write the code; Claude is the navigator: it keeps the plan
+as todo files in `.driver-seat/todos/`, web-searches before stating any external
+fact (via `research`), briefs each todo with edit sites and pitfalls, runs an
+automated review cycle on everything it produces, and takes only the chores you
+hand it. Turn on with `/driver-seat`; off with "stop driver-seat".
+
 ## Installation
 
 ```bash
@@ -32,6 +42,7 @@ claude plugin marketplace add ianwilson97/claude-skills
 # Install a plugin (learning-mode brings all three learning skills)
 claude plugin install learning-mode@claude-skills
 claude plugin install research@claude-skills
+claude plugin install driver-seat@claude-skills
 ```
 
 ## Development
