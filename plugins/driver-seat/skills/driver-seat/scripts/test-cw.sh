@@ -11,6 +11,10 @@ st() { "$@" >/dev/null 2>&1; print $? }
 z() { CW_DRY_RUN=1 CW_OPENROUTER_API_KEY=${CW_OPENROUTER_API_KEY:-dummy} zsh -f $cw "$@" }
 
 live=0; [[ ${1:-} == --live ]] && live=1
+L=${CW_TEST_REPO:-$HOME/.cache/cw-test-repo}
+# the live run wipes $L/.driver-seat, so refuse a repo that holds real driver-seat state
+(( live )) && [[ -e $L/.driver-seat/todos || -e $L/.driver-seat/workers.tsv ]] && {
+  print "live: $L has real driver-seat state (todos/ or workers.tsv); refusing"; exit 1 }
 tmp=$(mktemp -d ${TMPDIR%/}/cw-test.XXXXXX)
 cleanup() { (( owned )) && tmux kill-session -t cw 2>/dev/null; rm -rf $tmp }
 trap cleanup EXIT
@@ -20,6 +24,7 @@ git init -q $repo && git -C $repo commit -q --allow-empty -m init
 mkdir -p $repo/.driver-seat/tasks $repo/sub
 print -l -- '---' 'job: research' '---' \
   '# What is the latest tmux release? Cite its GitHub release page.' \
+  '## Context' 'Follow the method and output format in ~/.agents/skills/research/SKILL.md; skip its archive step.' \
   '## Done when' '- the result names the version and links the release page' \
   > $repo/.driver-seat/tasks/001-res.md
 print -l -- '---' 'job: chore' 'test: true   # trivial test command' '---' \
@@ -27,30 +32,48 @@ print -l -- '---' 'job: chore' 'test: true   # trivial test command' '---' \
   'test: this-line-is-body-not-frontmatter' \
   '## Done when' '- README.md ends with that line and the change is committed' \
   > $repo/.driver-seat/tasks/002-chore.md
+print x > "$repo/.driver-seat/tasks/001 Bad.md"   # so an id check, not a missing file, must reject it
 cd $repo
 real=$(pwd -P)
+head=$(git rev-parse HEAD)
 
 check "no args exits 2"                 '[[ $(st z) == 2 ]]'
 check "unknown job exits 2"             '[[ $(st z deploy 001-res boss) == 2 ]]'
-check "unsafe task id exits 2"          '[[ $(st z research "1 bad/ID" boss) == 2 ]]'
+check "unsafe task id exits 2"          '[[ $(st z research "001 Bad" boss) == 2 ]]'
+check "uppercase task id exits 2"       '[[ $(st z research 001-RES boss) == 2 ]]'
 check "missing task file exits 2"       '[[ $(st z research 009-nope boss) == 2 ]]'
 check "--check is off without key"      '[[ $(st env -u CW_OPENROUTER_API_KEY zsh -f $cw --check) == 1 ]]'
-check "--check is on with key"          '[[ $(st env CW_OPENROUTER_API_KEY=k zsh -f $cw --check) == 0 ]]'
+check "--check is off without tmux"     '[[ $(st env PATH=/usr/bin:/bin CW_OPENROUTER_API_KEY=k zsh -f $cw --check) == 1 ]]'
+check "--check is on with key and tmux" '[[ $(st env CW_OPENROUTER_API_KEY=k zsh -f $cw --check) == 0 ]]'
 check "launch without key exits 2"      '[[ $(st env -u CW_OPENROUTER_API_KEY CW_DRY_RUN=1 zsh -f $cw research 001-res boss) == 2 ]]'
-check "research launch validates"       '[[ $(z research 001-res boss) == "repo=$real" ]]'
-check "works from a subdirectory"       '[[ $(cd sub && z research 001-res boss) == "repo=$real" ]]'
+check "research launch validates"       '[[ $(z research 001-res boss) == "repo=$real${nl}"* ]]'
+check "research runs in .driver-seat"   '[[ $(z research 001-res boss) == *"${nl}dir=$real/.driver-seat${nl}"* ]]'
+check "works from a subdirectory"       '[[ $(cd sub && z research 001-res boss) == "repo=$real${nl}"* ]]'
 git worktree add -q -b side $tmp/other-wt
-check "works from inside a worktree"    '[[ $(cd $tmp/other-wt && z research 001-res boss) == "repo=$real" ]]'
+git -C $tmp/other-wt commit -q --allow-empty -m side-only
+mkdir -p $tmp/other-wt/.driver-seat && cp -R .driver-seat/tasks $tmp/other-wt/.driver-seat/
+wt=$(cd $tmp/other-wt && pwd -P); wthead=$(git -C $wt rev-parse HEAD)
+check "linked worktree is its own repo" '[[ $(cd $wt && z research 001-res boss) == "repo=$wt${nl}"* ]]'
+check "chore branches from caller HEAD" '[[ $(cd $wt && z chore 002-chore boss) == *"${nl}base=$wthead${nl}"* ]]'
 check "outside a repo exits 2"          '[[ $(cd $tmp && st z research 001-res boss) == 2 ]]'
 git branch -q cw/002-chore
 check "existing chore branch exits 2"   '[[ $(st z chore 002-chore boss) == 2 ]]'
 git branch -q -D cw/002-chore
-check "chore launch validates"          '[[ $(z chore 002-chore boss) == "repo=$real" ]]'
-chore=$(z --run chore 002-chore boss $real)
-research=$(z --run research 001-res boss $real)
+check "chore launch validates"          '[[ $(z chore 002-chore boss) == "repo=$real${nl}"* ]]'
+check "model override is resolved at launch" '[[ $(CW_CHORE_MODEL=x/override z chore 002-chore boss) == *"${nl}model=x/override" ]]'
+fake=$tmp/fake-bin; mkdir -p $fake; print -l '#!/bin/sh' 'exit 1' > $fake/tmux; chmod +x $fake/tmux
+check "failed launch removes chore branch and worktree" \
+  '[[ $(st env PATH=$fake:$PATH CW_OPENROUTER_API_KEY=k zsh -f $cw chore 002-chore boss) == 1 ]] && ! git show-ref -q --verify refs/heads/cw/002-chore && [[ ! -e .driver-seat/wt/002-chore ]]'
+chore=$(z --run chore 002-chore boss $real m/chore)
+research=$(z --run research 001-res boss $real m/res)
+check "run mode uses the passed model"  '[[ $chore == "model=m/chore${nl}claude${nl}"* ]]'
 check "chore allows its test command"   '[[ $chore == *"Bash(true:*)"* ]]'
 check "body test: line is ignored"      '[[ -n $chore && $chore != *this-line-is-body* ]]'
 check "research cannot git commit"      '[[ -n $research && $research != *"git commit"* ]]'
+check "research cannot run curl"        '[[ -n $research && $research != *curl* ]]'
+check "research denies the shell"       '[[ $research == *"${nl}--disallowedTools${nl}Bash${nl}"* && $research == *"You have no shell"* ]]'
+check "chore keeps its shell"           '[[ -n $chore && $chore != *--disallowedTools* ]]'
+check "research prompt marks repo read-only" '[[ $research == *"Repo under study: $real (read it, never edit it)."* ]]'
 check "lean flags present"              '[[ $chore == *"${nl}--setting-sources${nl}project,local${nl}--strict-mcp-config${nl}"* ]]'
 check "prompt follows permission mode"  '[[ $chore == *"${nl}--permission-mode${nl}acceptEdits${nl}You are cw-002-chore, a chore worker for boss."* ]]'
 check "result path in prompt"           '[[ $chore == *"Write your result to $real/.driver-seat/results/002-chore.md."* ]]'
@@ -58,10 +81,9 @@ check "result path in prompt"           '[[ $chore == *"Write your result to $re
 if (( live )); then
   [[ -n ${CW_OPENROUTER_API_KEY:-} ]] || { print "live: CW_OPENROUTER_API_KEY is unset"; exit 1 }
   tmux has-session -t cw 2>/dev/null && { print "live: tmux session cw exists; close it first"; exit 1 }
-  L=${CW_TEST_REPO:-$HOME/.cache/cw-test-repo}
   [[ -d $L/.git ]] || { git init -q $L && git -C $L commit -q --allow-empty -m init }
   rm -rf $L/.driver-seat; git -C $L worktree prune; git -C $L branch -q -D cw/002-chore 2>/dev/null
-  mkdir -p $L/.driver-seat/tasks && cp $repo/.driver-seat/tasks/*.md $L/.driver-seat/tasks/
+  mkdir -p $L/.driver-seat/tasks && cp $repo/.driver-seat/tasks/00?-*.md $L/.driver-seat/tasks/
   cd $L
   owned=1
   tmux new-session -d -s cw            # a cw session without a workers window (Review Focus 4)

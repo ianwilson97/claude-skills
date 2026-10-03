@@ -52,10 +52,11 @@ cw <research|chore> <task-id> <orchestrator-name>
 ```
 
 1. Refuse to run unless `CW_OPENROUTER_API_KEY` is set (dedicated OpenRouter key with a credit limit — the spend cap) and `.driver-seat/tasks/<task-id>.md` exists.
-2. Model per job: two variables at the top, `CW_RESEARCH_MODEL` and `CW_CHORE_MODEL`, both defaulting to `deepseek/deepseek-v4.1-flash`.
-3. Working directory:
-   - research: the repo root.
-   - chore: `git worktree add .driver-seat/wt/<task-id> -b cw/<task-id>`, cwd = that worktree.
+2. Model per job: two variables at the top, `CW_RESEARCH_MODEL` and `CW_CHORE_MODEL`, both defaulting to `deepseek/deepseek-v4.1-flash`. Resolved at launch and passed to the pane in the run string, because a tmux pane gets the server's env, not the caller's.
+3. Working directory. "Repo" means the caller's checkout (`git rev-parse --show-toplevel`); a linked worktree is its own checkout.
+   - research: `<repo>/.driver-seat`, so `acceptEdits` auto-approves edits there only, never in the driver's code. The repo is read-only for the worker. The shell is denied (`--disallowedTools Bash`), because an unlisted shell call would wait on a permission prompt nobody answers.
+   - chore: `git worktree add .driver-seat/wt/<task-id> -b cw/<task-id> <caller's HEAD>`, cwd = that worktree.
+   - Any launch failure removes the chore's branch and worktree, so a relaunch starts clean.
 4. Environment (as the probe launcher): `ANTHROPIC_BASE_URL=https://openrouter.ai/api`, `ANTHROPIC_AUTH_TOKEN=$CW_OPENROUTER_API_KEY`, `ANTHROPIC_API_KEY=""`, and every `ANTHROPIC_DEFAULT_*_MODEL` plus `CLAUDE_CODE_SUBAGENT_MODEL` set to the job's model.
 5. Command:
    ```
@@ -63,7 +64,7 @@ cw <research|chore> <task-id> <orchestrator-name>
      --permission-mode acceptEdits --add-dir <repo>/.driver-seat \
      --allowedTools <job allowlist> "<first prompt>"
    ```
-   - research allowlist: `Read Grep Glob Write Edit WebFetch WebSearch Bash(curl:*) ListAgents SendMessage`
+   - research allowlist: `Read Grep Glob Write Edit WebFetch WebSearch ListAgents SendMessage` (no shell; see Phase 0 results for the final flags, which replace `--bare`)
    - chore allowlist: `Read Grep Glob Write Edit Bash(git status:*) Bash(git diff:*) Bash(git add:*) Bash(git commit:*) ListAgents SendMessage`, plus `Bash(<test>:*)` when the task frontmatter has `test:`.
 6. tmux: session `cw`, window `workers`. Create the session detached if missing (`tmux new-session -d -s cw -n workers`), else `split-window` into `cw:workers`; then `select-layout tiled`. Label the pane with a pane option, `set -p @cw cw-<task-id>` (not `select-pane -T`: Claude Code overwrites the pane title), and for the `cw` session only set `mouse on`, `pane-border-status top`, `pane-border-format " #{@cw} "`.
 7. Ready check, polling `capture-pane` for up to 30 s: ready when the capture contains the model id (it appears in Claude Code's status line) and none of the blocking-dialog strings `trust this folder`, `Enter to continue`. On a dialog string or timeout: print the pane capture, kill the pane, exit 1. Never send keystrokes to a dialog.

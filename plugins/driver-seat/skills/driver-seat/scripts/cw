@@ -2,9 +2,9 @@
 # cw — run one driver-seat research/chore task on a cheap pinned OpenRouter model,
 # as an interactive Claude Code worker in a tiled tmux pane (session `cw`, window `workers`).
 #
-#   cw --check                         exit 0 if cw is enabled on this machine
-#   cw <research|chore> <id> <boss>    launch worker cw-<id>; prints its tmux pane id
-#   cw --run <job> <id> <boss> <repo>  (inside the pane) exec the worker
+#   cw --check                                 exit 0 if cw is enabled on this machine
+#   cw <research|chore> <id> <boss>            launch worker cw-<id>; prints its tmux pane id
+#   cw --run <job> <id> <boss> <repo> <model>  (inside the pane) exec the worker
 #
 # CW_DRY_RUN=1 validates and prints instead of touching git/tmux/claude (used by test-cw.sh).
 # ponytail: models are two variables, not a config file.
@@ -13,17 +13,16 @@ CW_CHORE_MODEL=${CW_CHORE_MODEL:-deepseek/deepseek-v4.1-flash}
 
 die() { print -u2 -- "cw: $1"; exit ${2:-2} }
 
-[[ $1 == --check ]] && { [[ -n $CW_OPENROUTER_API_KEY ]]; exit }
+[[ $1 == --check ]] && { [[ -n $CW_OPENROUTER_API_KEY ]] && (( $+commands[tmux] )); exit }
 
 if [[ $1 == --run ]]; then
-  (( $# == 5 )) || die "usage: cw --run <job> <task-id> <orchestrator-name> <repo>"
-  mode=run job=$2 id=$3 boss=$4 repo=$5
+  (( $# == 6 )) || die "usage: cw --run <job> <task-id> <orchestrator-name> <repo> <model>"
+  mode=run job=$2 id=$3 boss=$4 repo=$5 model=$6
 else
   (( $# == 3 )) || die "usage: cw <research|chore> <task-id> <orchestrator-name>"
   mode=launch job=$1 id=$2 boss=$3
-  # the common dir is the main repo's .git, so this works from a subdir or a chore worktree too
-  repo=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || die "not inside a git repo"
-  repo=${repo:h}
+  # the caller's checkout: works from a subdir, and a linked worktree is its own checkout
+  repo=$(git rev-parse --show-toplevel 2>/dev/null) || die "not inside a git repo"
 fi
 
 [[ $job == (research|chore) ]] || die "job must be research or chore, got '$job'"
@@ -34,10 +33,15 @@ task=$ds/tasks/$id.md
 [[ -f $task ]] || die "missing task file $task"
 
 if [[ $job == research ]]; then
-  model=$CW_RESEARCH_MODEL dir=$repo
-  tools=(Read Grep Glob Write Edit WebFetch WebSearch 'Bash(curl:*)' ListAgents SendMessage)
+  [[ $mode == launch ]] && model=$CW_RESEARCH_MODEL
+  # cwd .driver-seat: acceptEdits then auto-approves edits there only, never in the driver's code
+  dir=$ds
+  tools=(Read Grep Glob Write Edit WebFetch WebSearch ListAgents SendMessage)
+  # denied, not just unlisted: an unlisted shell call waits on a permission prompt nobody answers
+  deny=(--disallowedTools Bash)
 else
-  model=$CW_CHORE_MODEL dir=$ds/wt/$id
+  [[ $mode == launch ]] && model=$CW_CHORE_MODEL
+  dir=$ds/wt/$id
   tools=(Read Grep Glob Write Edit 'Bash(git status:*)' 'Bash(git diff:*)' 'Bash(git add:*)' 'Bash(git commit:*)' ListAgents SendMessage)
   # `test:` from the frontmatter only, trailing comment dropped
   test_cmd=$(awk '/^---$/ {n++; next} n > 1 {exit} n == 1 && sub(/^test:[ \t]*/, "") {sub(/[ \t]+#.*$/, ""); print; exit}' $task)
@@ -46,7 +50,11 @@ fi
 
 if [[ $mode == run ]]; then
   prompt="You are cw-$id, a $job worker for $boss.
-Read $task and do exactly that task.
+Read $task and do exactly that task."
+  [[ $job == research ]] && prompt+="
+Repo under study: $repo (read it, never edit it).
+You have no shell; use WebFetch, WebSearch, Read, Grep and Glob."
+  prompt+="
 Scratch files go in $ds/tmp/ only.
 Write your result to $ds/results/$id.md.
 If blocked, SendMessage to $boss: \"blocked $id: <question>\" and wait.
@@ -58,8 +66,8 @@ When done, SendMessage to $boss: \"done $id\" plus a summary of at most 5 lines.
   # and plugins instead (Phase 0). --permission-mode stays last: --allowedTools and --add-dir are
   # variadic and would swallow the prompt.
   cmd=(claude -n cw-$id --model sonnet --setting-sources project,local --strict-mcp-config
-       --allowedTools ${(j:,:)tools} --add-dir $ds --permission-mode acceptEdits $prompt)
-  [[ -n $CW_DRY_RUN ]] && { print -l -- $cmd; exit 0 }
+       --allowedTools ${(j:,:)tools} $deny --add-dir $ds --permission-mode acceptEdits $prompt)
+  [[ -n $CW_DRY_RUN ]] && { print -l -- "model=$model" $cmd; exit 0 }
   exec command $cmd  # `command`: skip any `claude` shell function, e.g. one defined in ~/.zshenv
 fi
 
@@ -67,13 +75,25 @@ if [[ $job == chore ]]; then
   git -C $repo show-ref --quiet --verify refs/heads/cw/$id && die "branch cw/$id already exists"
   [[ -e $dir ]] && die "$dir already exists"
 fi
-[[ -n $CW_DRY_RUN ]] && { print -- "repo=$repo"; exit 0 }
+base=$(git -C $repo rev-parse HEAD)
+[[ -n $CW_DRY_RUN ]] && { print -l -- "repo=$repo" "dir=$dir" "base=$base" "model=$model"; exit 0 }
 
-mkdir -p $ds/results $ds/tmp $repo/.git/info
-grep -qx '.driver-seat/' $repo/.git/info/exclude 2>/dev/null || print '.driver-seat/' >> $repo/.git/info/exclude
-[[ $job == chore ]] && { git -C $repo worktree add -q -b cw/$id $dir || die "git worktree add failed" 1 }
+# from here on a failure undoes the chore's branch and worktree, so the relaunch starts clean
+fail() {
+  if [[ $job == chore ]]; then
+    git -C $repo worktree remove --force $dir
+    git -C $repo branch -q -D cw/$id
+  fi
+  die "$1" 1
+}
 
-run="exec ${(q)${0:A}} --run $job $id ${(q)boss} ${(q)repo}"
+common=$(git -C $repo rev-parse --path-format=absolute --git-common-dir)
+mkdir -p $ds/results $ds/tmp $common/info
+grep -qx '.driver-seat/' $common/info/exclude 2>/dev/null || print '.driver-seat/' >> $common/info/exclude
+[[ $job == chore ]] && { git -C $repo worktree add -q -b cw/$id $dir $base || die "git worktree add failed" 1 }
+
+# the model travels in the run string: a tmux pane gets the server's env, not this caller's
+run="exec ${(q)${0:A}} --run $job $id ${(q)boss} ${(q)repo} ${(q)model}"
 if ! tmux has-session -t cw 2>/dev/null; then
   pane=$(tmux new-session -d -s cw -n workers -x 200 -y 50 -c $dir -P -F '#{pane_id}' $run)
 elif ! tmux list-windows -t cw -F '#W' | grep -qx workers; then
@@ -81,7 +101,7 @@ elif ! tmux list-windows -t cw -F '#W' | grep -qx workers; then
 else
   pane=$(tmux split-window -d -t cw:workers -c $dir -P -F '#{pane_id}' $run)
 fi
-[[ -n $pane ]] || die "tmux could not open a pane" 1
+[[ -n $pane ]] || fail "tmux could not open a pane"
 tmux set -p -t $pane @cw cw-$id \; set -t cw mouse on \; \
   set -w -t cw:workers pane-border-status top \; set -w -t cw:workers pane-border-format ' #{@cw} ' \; \
   set -w -t cw:workers remain-on-exit on \; select-layout -t cw:workers tiled
@@ -101,5 +121,4 @@ for i in {1..30}; do
 done
 print -u2 -- $screen
 tmux kill-pane -t $pane
-[[ $job == chore ]] && git -C $repo worktree remove --force $dir && git -C $repo branch -q -D cw/$id
-die "worker cw-$id did not start cleanly (dialog, exit, or 30 s timeout)" 1
+fail "worker cw-$id did not start cleanly (dialog, exit, or 30 s timeout)"
