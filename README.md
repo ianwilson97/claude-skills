@@ -42,6 +42,9 @@ watch and talk to workers, split your terminal and run `tmux new -A -s cw`. With
 the key, driver-seat runs exactly as before. Design:
 `docs/superpowers/specs/2026-10-03-driver-seat-cheap-workers-design.md`.
 
+**Full user guide:** [plugins/driver-seat/README.md](plugins/driver-seat/README.md) covers the
+working loop, files, chores, research, reviews, cheap workers, tips and troubleshooting.
+
 ## Installation
 
 ```bash
