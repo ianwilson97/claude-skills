@@ -202,3 +202,16 @@ Any "no": adjust the affected flag or fall back to approach B before writing `cw
 - **Cache tail stall** (probe): only the ~78k prefix stayed cached. Fresh-per-task workers keep sessions short, which limits it; cause unverified.
 - **Unknown-model window:** Claude Code assumes a 200k context for the pinned model and auto-compacts there. Fine for short-lived workers.
 - **`--bare` scope:** if it disables something workers need beyond Phase 0's checks, drop it and keep `--strict-mcp-config` (the MCP schemas were the bulk of the 71k).
+
+## Phase 0 results (2026-10-03)
+
+| Check | Result | Decision applied |
+|---|---|---|
+| 0 auth under --bare | `token` works (`ANTHROPIC_AUTH_TOKEN` accepted) | keep `token` auth |
+| 1 --bare keeps messaging | **no**: a `--bare` worker creates no socket and is absent from `ListAgents` | drop `--bare`; use `--setting-sources project,local` (skips user settings, so user hooks and plugins) + `--strict-mcp-config`. Messaging works. Startup: 35k tokens (vs 71k full config, 1.1k bare); about 1 cent uncached per worker start. `--disable-slash-commands` measured no gain (39k) and is not used. |
+| 2a new repo under trusted folder | **prompts**: trust is not inherited by a new repo under a trusted folder | the live test uses a persistent test repo (`CW_TEST_REPO`, default `~/.cache/cw-test-repo`) trusted once |
+| 2b worktree under repo | trusted: no dialog in `.driver-seat/wt/<id>` of a trusted repo | none |
+| 3 billing dialog with acceptEdits | absent | none |
+| 4 orchestrator→worker delivery | delivered both ways (orchestrator in auto mode, worker in acceptEdits) | none |
+| 5 --add-dir write without prompt | yes | none |
+| 6 socket = pane pid; precedes dialogs | socket is named by claude's pid and did **not** appear while the trust dialog was up; but pane pid ≠ claude pid, because `~/.zshenv` defines a `claude` shell function, so `exec claude` runs the function, which forks | `cw` runs `exec command claude …`; the ready check looks for the socket of the pane process **or** its direct children (also covers PATH shims) |
