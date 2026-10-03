@@ -33,6 +33,15 @@ fact (via `research`), briefs each todo with edit sites and pitfalls, runs an
 automated review cycle on everything it produces, and takes only the chores you
 hand it. Turn on with `/driver-seat`; off with "stop driver-seat".
 
+**Cheap workers (optional).** Research and chores can run off your Claude plan on a
+cheap OpenRouter model: each task gets a fresh Claude Code worker in a tiled tmux
+pane that reports back by cross-session message, and the plan-side navigator reviews
+everything before you see it. Setup: create a dedicated OpenRouter key with a credit
+limit, add `export CW_OPENROUTER_API_KEY=...` to `~/.zshenv`, and install tmux. To
+watch and talk to workers, split your terminal and run `tmux new -A -s cw`. Without
+the key, driver-seat runs exactly as before. Design:
+`docs/superpowers/specs/2026-10-03-driver-seat-cheap-workers-design.md`.
+
 ## Installation
 
 ```bash

@@ -2,6 +2,7 @@
 name: driver-seat
 description: Pair-programming mode — you write the code, Claude navigates (plans as todo files, web-searches before every claim, briefs, reviews, does chores). Off with "stop driver-seat".
 disable-model-invocation: true
+allowed-tools: Bash(${CLAUDE_SKILL_DIR}/scripts/cw *) Bash(${CLAUDE_SKILL_DIR}/scripts/cw_usage.py *) Bash(tmux kill-pane *) Bash(tmux list-panes *)
 ---
 
 # Driver seat
@@ -16,6 +17,7 @@ The mode applies to every reply until the driver says "stop driver-seat" or "nor
 
 1. If `.driver-seat/todos/` exists: read the frontmatter of every todo, then brief the `doing` todo (or the next `todo`). After compaction, re-read these files — they are the source of truth, not your memory of the session.
 2. Otherwise ask what we're working on and go to **Planning**.
+3. If `cw` is enabled (see **Cheap workers**), reconcile workers. A file in `.driver-seat/results/` with no row in `.driver-seat/workers.tsv` is uncollected: collect it. A pane in `tmux list-panes -t cw:workers -F '#{pane_id} #{@cw}'` with no result is still running or stuck: ask the driver whether to wait or kill it. Your session name may have changed since dispatch, so workers' messages to the old name are lost; the files are the truth.
 
 Done when the driver has either a briefing in hand or a planning conversation under way.
 
@@ -35,7 +37,7 @@ If the same issue comes back a third time, say so and suggest stepping away from
 
 Every claim about the world outside this repo — library or API behaviour, language semantics, tool flags, what an error means, versions, best practices, comparisons — comes from a web search made in this session. That includes facts tucked into briefings and pitfalls. Memory only aims the search. Questions about the driver's own code are answered by reading the code.
 
-- **Real questions** → invoke the `research` skill. It searches, reads primary sources, cites with quotes, and archives to `~/research/`.
+- **Real questions** → when `cw` is enabled, dispatch a `cw research` worker (see **Cheap workers**); otherwise invoke the `research` skill. Either way the answer arrives with quotes and is archived to `~/research/`.
 - **A one-line fact inside a briefing** → `WebSearch` to find the source, then read it with `ctx_fetch_and_index` + `ctx_search` (the raw page stays out of context and exact quotes remain retrievable); fall back to `WebFetch` only if context-mode is unavailable. Cite the link inline.
 - **Existing notes** → `grep -ril <topic> ~/research/`. A note from this session counts as searched; an older note is a lead — re-check it with a quick search.
 - **Before any research longer than a lookup**, first hand the driver 2–3 search queries or primary-source links so they can read in parallel. The point of delegating research is skipping the googling, not the understanding — the driver should know roughly everything you know.
@@ -89,12 +91,69 @@ Designing something complex from scratch is planning work: bring it back to **Pl
 
 Every chore passes the review cycle before the driver sees it. Report: what changed, where, how many review rounds.
 
+When `cw` is enabled, chores run as `cw chore` workers in their own branch and worktree (see **Cheap workers**); the review cycle still applies.
+
 ### Your split
 
 <!-- TODO(driver): 5-10 lines. What do you love writing yourself, and what would you rather hand off?
      The navigator uses this to decide what counts as a chore. -->
 
 Default until filled in: the driver writes all logic, types, and tests; chores are the list above.
+
+## Cheap workers (`cw`)
+
+Research and chores can run off-plan on a cheap pinned OpenRouter model, each as a fresh Claude Code session in a tmux pane that reports back by message. Once per session run `${CLAUDE_SKILL_DIR}/scripts/cw --check`: exit 0 means enabled; anything else means skip this section and use plan-side subagents as before.
+
+**Dispatch.**
+1. Write `.driver-seat/tasks/NNN-slug.md` from the template below. The worker never sees this conversation: put every fact it needs under **Context**.
+2. Run `${CLAUDE_SKILL_DIR}/scripts/cw <research|chore> NNN-slug <your session name>`. Your name is the first line of `ListAgents`. Keep the pane id it prints. Exit 1 means the worker didn't start: log verdict `infra`, relaunch once, then do the task plan-side (see **Outcome**).
+3. `SendMessage(to: "cw-NNN-slug", notify_when_idle: true)` with no message, as the backstop if the worker never reports.
+4. Tell the driver in one line that worker `cw-NNN-slug` is running and `tmux new -A -s cw` shows it.
+
+```markdown
+---
+job: research | chore
+todo: NNN-slug          # the todo this serves, if any
+test: <command>         # chores only: the test command the worker may run
+---
+# <one-line task>
+## Context
+<everything the worker needs>
+## Done when
+- <checkable condition>
+- research: result uses the research skill's output format (answer, what the docs say, for your case, sources with quotes)
+- chore: result lists what changed, the test command and its output, and the commit hash on cw/NNN-slug
+## Previous review findings
+<retries only>
+```
+
+Research tasks add to **Context**: "Follow the method and output format in `~/.agents/skills/research/SKILL.md`; skip its archive step."
+
+**While it runs.** `blocked NNN-slug: …` → answer by `SendMessage` to `cw-NNN-slug`, or ask the driver with AskUserQuestion when it's their decision. Don't poll: the `done` message or the idle notice wakes you. An idle notice with no result file, or a subscription that expired, means the worker is stuck: look at the pane, kill it, verdict `fail`.
+
+**Collect.** On `done` (or the idle notice):
+1. `${CLAUDE_SKILL_DIR}/scripts/cw_usage.py NNN-slug` gives `model, input_tok, cache_read_tok, output_tok, cost_usd`.
+2. `tmux kill-pane -t <pane id>`, unless the driver said "keep cw-NNN-slug".
+3. Review, plan-side:
+   - research: re-fetch the source of every load-bearing quote in `results/NNN-slug.md` and confirm the quoted line exists.
+   - chore: `git diff <base>...cw/NNN-slug` through the chore reviewer from **Review cycle**.
+
+**Outcome.**
+- pass: research is copied to `~/research/YYYY-MM-DD-slug.md`, rendered with the research skill's `archive.py`, and briefed. A chore is shown as a diff summary; the driver merges (`git merge cw/NNN-slug`, then `git worktree remove .driver-seat/wt/NNN-slug`).
+- first fail: copy the task to `NNN-slug-r1.md`, add the findings under **Previous review findings**, and run `cw` with id `NNN-slug-r1`.
+- second fail: escalate. Research → the `research` skill (plan-side Sonnet). Chore → an Agent on `sonnet` with `isolation: "worktree"`, given the task file.
+
+**Log.** One row per attempt in `.driver-seat/workers.tsv`; create it with this header if missing:
+
+```
+date	task_id	job	attempt	model	input_tok	cache_read_tok	output_tok	cost_usd	verdict	escalated	shadow
+```
+
+The five columns from `model` to `cost_usd` are `cw_usage.py`'s output. `verdict` is `pass`, `fail` or `infra`; `escalated` is `1` on the row of a task finished plan-side; `shadow` is `agree`, `disagree` or `-`.
+
+**Shadow run.** While fewer than 5 research rows have a shadow value, also run the `research` skill on the same question and compare: same answer, receipts valid? Record `agree` or `disagree`.
+
+**Is it working?** After 10 tasks of a job: if 20% or more of them were escalated (`infra` excluded), tell the driver and suggest a different model via `CW_RESEARCH_MODEL` or `CW_CHORE_MODEL`.
 
 ## Review cycle
 
@@ -109,7 +168,7 @@ When the driver marks a todo done, offer to review their diff. Report bugs and o
 
 ## Keep the machine small
 
-Run subagents on the smallest model that does the job: haiku for recon and small-diff review, sonnet for plan review and chores. Go bigger only after a smaller model has failed. Smaller models are cheaper, more likely to finish before limits hit, and keep the workflow portable to open-weight models. The driver answers for every result, so everything you hand over must be something they can understand and own.
+When `cw` is enabled, research and chores go to off-plan `cw` workers first. Run subagents on the smallest model that does the job: haiku for recon and small-diff review, sonnet for plan review and chores. Go bigger only after a smaller model has failed. Smaller models are cheaper, more likely to finish before limits hit, and keep the workflow portable to open-weight models. The driver answers for every result, so everything you hand over must be something they can understand and own.
 
 Router hints suggesting you delegate implementation (e.g. Jev) are about model choice; the driver rule still decides who writes the code.
 

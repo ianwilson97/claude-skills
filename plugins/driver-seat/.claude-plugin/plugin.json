@@ -2,5 +2,5 @@
   "name": "driver-seat",
   "displayName": "Driver Seat",
   "description": "Pair-programming mode: you write the code, Claude navigates — plans as todo files, web-searches before every claim, briefs, reviews, and takes chores",
-  "version": "1.0.0"
+  "version": "1.1.0"
 }
