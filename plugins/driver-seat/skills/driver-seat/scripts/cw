@@ -1,0 +1,105 @@
+#!/bin/zsh
+# cw — run one driver-seat research/chore task on a cheap pinned OpenRouter model,
+# as an interactive Claude Code worker in a tiled tmux pane (session `cw`, window `workers`).
+#
+#   cw --check                         exit 0 if cw is enabled on this machine
+#   cw <research|chore> <id> <boss>    launch worker cw-<id>; prints its tmux pane id
+#   cw --run <job> <id> <boss> <repo>  (inside the pane) exec the worker
+#
+# CW_DRY_RUN=1 validates and prints instead of touching git/tmux/claude (used by test-cw.sh).
+# ponytail: models are two variables, not a config file.
+CW_RESEARCH_MODEL=${CW_RESEARCH_MODEL:-deepseek/deepseek-v4.1-flash}
+CW_CHORE_MODEL=${CW_CHORE_MODEL:-deepseek/deepseek-v4.1-flash}
+
+die() { print -u2 -- "cw: $1"; exit ${2:-2} }
+
+[[ $1 == --check ]] && { [[ -n $CW_OPENROUTER_API_KEY ]]; exit }
+
+if [[ $1 == --run ]]; then
+  (( $# == 5 )) || die "usage: cw --run <job> <task-id> <orchestrator-name> <repo>"
+  mode=run job=$2 id=$3 boss=$4 repo=$5
+else
+  (( $# == 3 )) || die "usage: cw <research|chore> <task-id> <orchestrator-name>"
+  mode=launch job=$1 id=$2 boss=$3
+  # the common dir is the main repo's .git, so this works from a subdir or a chore worktree too
+  repo=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || die "not inside a git repo"
+  repo=${repo:h}
+fi
+
+[[ $job == (research|chore) ]] || die "job must be research or chore, got '$job'"
+[[ $id =~ '^[0-9]{3}-[a-z0-9-]+$' ]] || die "task id must look like 012-slug, got '$id'"
+[[ -n $CW_OPENROUTER_API_KEY ]] || die "CW_OPENROUTER_API_KEY unset: cw is off on this machine"
+ds=$repo/.driver-seat
+task=$ds/tasks/$id.md
+[[ -f $task ]] || die "missing task file $task"
+
+if [[ $job == research ]]; then
+  model=$CW_RESEARCH_MODEL dir=$repo
+  tools=(Read Grep Glob Write Edit WebFetch WebSearch 'Bash(curl:*)' ListAgents SendMessage)
+else
+  model=$CW_CHORE_MODEL dir=$ds/wt/$id
+  tools=(Read Grep Glob Write Edit 'Bash(git status:*)' 'Bash(git diff:*)' 'Bash(git add:*)' 'Bash(git commit:*)' ListAgents SendMessage)
+  # `test:` from the frontmatter only, trailing comment dropped
+  test_cmd=$(awk '/^---$/ {n++; next} n > 1 {exit} n == 1 && sub(/^test:[ \t]*/, "") {sub(/[ \t]+#.*$/, ""); print; exit}' $task)
+  [[ -n $test_cmd ]] && tools+=("Bash($test_cmd:*)")
+fi
+
+if [[ $mode == run ]]; then
+  prompt="You are cw-$id, a $job worker for $boss.
+Read $task and do exactly that task.
+Scratch files go in $ds/tmp/ only.
+Write your result to $ds/results/$id.md.
+If blocked, SendMessage to $boss: \"blocked $id: <question>\" and wait.
+When done, SendMessage to $boss: \"done $id\" plus a summary of at most 5 lines."
+  export ANTHROPIC_BASE_URL=https://openrouter.ai/api ANTHROPIC_AUTH_TOKEN=$CW_OPENROUTER_API_KEY ANTHROPIC_API_KEY=
+  export ANTHROPIC_DEFAULT_OPUS_MODEL=$model ANTHROPIC_DEFAULT_SONNET_MODEL=$model
+  export ANTHROPIC_DEFAULT_HAIKU_MODEL=$model CLAUDE_CODE_SUBAGENT_MODEL=$model
+  # no --bare: it turns off cross-session messaging. Skipping user settings drops the user's hooks
+  # and plugins instead (Phase 0). --permission-mode stays last: --allowedTools and --add-dir are
+  # variadic and would swallow the prompt.
+  cmd=(claude -n cw-$id --model sonnet --setting-sources project,local --strict-mcp-config
+       --allowedTools ${(j:,:)tools} --add-dir $ds --permission-mode acceptEdits $prompt)
+  [[ -n $CW_DRY_RUN ]] && { print -l -- $cmd; exit 0 }
+  exec command $cmd  # `command`: skip any `claude` shell function, e.g. one defined in ~/.zshenv
+fi
+
+if [[ $job == chore ]]; then
+  git -C $repo show-ref --quiet --verify refs/heads/cw/$id && die "branch cw/$id already exists"
+  [[ -e $dir ]] && die "$dir already exists"
+fi
+[[ -n $CW_DRY_RUN ]] && { print -- "repo=$repo"; exit 0 }
+
+mkdir -p $ds/results $ds/tmp $repo/.git/info
+grep -qx '.driver-seat/' $repo/.git/info/exclude 2>/dev/null || print '.driver-seat/' >> $repo/.git/info/exclude
+[[ $job == chore ]] && { git -C $repo worktree add -q -b cw/$id $dir || die "git worktree add failed" 1 }
+
+run="exec ${(q)${0:A}} --run $job $id ${(q)boss} ${(q)repo}"
+if ! tmux has-session -t cw 2>/dev/null; then
+  pane=$(tmux new-session -d -s cw -n workers -x 200 -y 50 -c $dir -P -F '#{pane_id}' $run)
+elif ! tmux list-windows -t cw -F '#W' | grep -qx workers; then
+  pane=$(tmux new-window -t cw: -n workers -c $dir -P -F '#{pane_id}' $run)
+else
+  pane=$(tmux split-window -d -t cw:workers -c $dir -P -F '#{pane_id}' $run)
+fi
+[[ -n $pane ]] || die "tmux could not open a pane" 1
+tmux set -p -t $pane @cw cw-$id \; set -t cw mouse on \; \
+  set -w -t cw:workers pane-border-status top \; set -w -t cw:workers pane-border-format ' #{@cw} ' \; \
+  set -w -t cw:workers remain-on-exit on \; select-layout -t cw:workers tiled
+
+pp=$(tmux display -p -t $pane '#{pane_pid}')
+clean=0
+for i in {1..30}; do
+  sleep 1
+  screen=$(tmux capture-pane -p -t $pane)
+  [[ $screen == *("trust this folder"|"Enter to continue")* ]] && break
+  [[ $(tmux display -p -t $pane '#{pane_dead}') == 1 ]] && break
+  # Claude Code names its messaging socket after its pid: the pane process, or its child when a
+  # shell function or PATH shim sits in between (Phase 0 check 6)
+  for p in $pp $(pgrep -P $pp); do
+    [[ -S /tmp/cc-socks/$p.sock ]] && (( ++clean >= 2 )) && { print -- $pane; exit 0 }
+  done
+done
+print -u2 -- $screen
+tmux kill-pane -t $pane
+[[ $job == chore ]] && git -C $repo worktree remove --force $dir && git -C $repo branch -q -D cw/$id
+die "worker cw-$id did not start cleanly (dialog, exit, or 30 s timeout)" 1
