@@ -190,7 +190,9 @@ back is fine; loosening the standard for the ones you do back is not.
 
 ## Output format
 
-Lead with the answer. The user is blocked; make the first line useful. Then:
+The full answer is written once, to the archive file (see **Archive the answer**),
+in this format. Lead with the answer; the reader is blocked, so make the first
+line useful:
 
 ```
 **[One-sentence direct answer.]** [Version it applies to, if version-sensitive.]
@@ -212,6 +214,18 @@ context isn't visible, say what you assumed in one line.
 
 Drop sections that don't earn their place — a one-line flag question doesn't
 need "What the docs say", it needs the answer and the citation.
+
+## The reply
+
+Keep the reply short; the file holds the receipts:
+
+- the one-sentence answer, and the version it applies to,
+- the one gotcha that will bite them next, if there is one,
+- the path to the file.
+
+Don't paste the file's content into the reply. Writing the answer twice doubles
+the output tokens and leaves two copies to keep in sync; whoever wants the
+snippet and the citations opens the file.
 
 ## Citations: point at the line, not the page
 
@@ -253,12 +267,11 @@ Mark tier-4 sources inline so confidence is visible:
 
 ## Archive the answer
 
-After delivering inline, write the same content to
-`~/research/YYYY-MM-DD-short-slug.md` so it's greppable later — this is a
-research log the user accumulates, and past answers are how they avoid asking
-twice. Create the directory if needed.
+Write the answer to `~/research/YYYY-MM-DD-short-slug.md`. It is the only full
+copy, and part of a research log the user greps later: past answers are how they
+avoid asking twice. Create the directory if needed.
 
-Add a short frontmatter block for retrieval:
+Start it with a short frontmatter block for retrieval:
 
 ```markdown
 ---
@@ -268,31 +281,8 @@ stack: <library/spec + version the answer is anchored to>
 ---
 ```
 
-Then **the inline answer copied verbatim** — frontmatter prepended, nothing
-rewritten, trimmed, or expanded. Write the answer once and use it twice. Two
-reasons this matters: a file that's a re-worded variant of what you said is a
-second thing to trust, and re-composing it costs a round of work for no gain.
-So the file is exactly what you said, and any change to that content changes
-both.
-
-**Then render it and open it in the browser:**
-
-```bash
-python3 ~/.claude/skills/research/scripts/archive.py ~/research/YYYY-MM-DD-slug.md
-```
-
-This writes a styled, self-contained `.html` next to the `.md` and opens it.
-Run it every time — a research note you have to go find is a research note you
-won't read again.
-
-Do **not** hand-write the HTML. The script owns the markup, so you only ever
-author markdown: that keeps the `.md` greppable as the source of truth, keeps
-every note styled the same, and costs you zero tokens on formatting. The
-rendering deliberately makes quoted citations visually prominent, since
-scanning the receipts is the main reason to reopen one of these.
-
-Mention the path in one short line at the end of your reply — don't make a
-ceremony of it.
+Then the answer in the format above. The markdown file is the whole archive:
+don't render or open anything else.
 
 If a file for the same question already exists, update it rather than making a
 near-duplicate, and note what changed (a re-check months later that finds an API

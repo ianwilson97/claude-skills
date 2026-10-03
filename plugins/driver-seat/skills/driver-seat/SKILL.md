@@ -37,7 +37,7 @@ If the same issue comes back a third time, say so and suggest stepping away from
 
 Every claim about the world outside this repo — library or API behaviour, language semantics, tool flags, what an error means, versions, best practices, comparisons — comes from a web search made in this session. That includes facts tucked into briefings and pitfalls. Memory only aims the search. Questions about the driver's own code are answered by reading the code.
 
-- **Real questions** → when `cw` is enabled, dispatch a `cw research` worker (see **Cheap workers**); otherwise invoke the `research` skill. Either way the answer arrives with quotes and is archived to `~/research/`.
+- **Real questions** → when `cw` is enabled, dispatch a `cw research` worker (see **Cheap workers**); otherwise invoke the `research` skill. Either way you get a short answer plus a path; the full answer, with quotes, lands in `~/research/`.
 - **A one-line fact inside a briefing** → `WebSearch` to find the source, then read it with `ctx_fetch_and_index` + `ctx_search` (the raw page stays out of context and exact quotes remain retrievable); fall back to `WebFetch` only if context-mode is unavailable. Cite the link inline.
 - **Existing notes** → `grep -ril <topic> ~/research/`. A note from this session counts as searched; an older note is a lead — re-check it with a quick search.
 - **Before any research longer than a lookup**, first hand the driver 2–3 search queries or primary-source links so they can read in parallel. The point of delegating research is skipping the googling, not the understanding — the driver should know roughly everything you know.
@@ -127,7 +127,7 @@ test: <command>         # chores only: the test command the worker may run
 <retries only>
 ```
 
-Research tasks add to **Context**: "Follow the method and output format in `~/.agents/skills/research/SKILL.md`; skip its archive step."
+Research tasks add to **Context**: "Follow the method and output format in `~/.agents/skills/research/SKILL.md`; write the answer to your result file, not to `~/research/`."
 
 **While it runs.** `blocked NNN-slug: …` → answer by `SendMessage` to `cw-NNN-slug`, or ask the driver with AskUserQuestion when it's their decision. Don't poll: the `done` message or the idle notice wakes you. An idle notice with no result file, or a subscription that expired, means the worker is stuck: look at the pane, kill it, verdict `fail`.
 
@@ -139,7 +139,7 @@ Research tasks add to **Context**: "Follow the method and output format in `~/.a
    - chore: `git diff <base>...cw/NNN-slug` through the chore reviewer from **Review cycle**.
 
 **Outcome.**
-- pass: research is copied to `~/research/YYYY-MM-DD-slug.md`, rendered with the research skill's `archive.py`, and briefed. A chore is shown as a diff summary; the driver merges (`git merge cw/NNN-slug`, then `git worktree remove .driver-seat/wt/NNN-slug`).
+- pass: research is copied to `~/research/YYYY-MM-DD-slug.md` and briefed. A chore is shown as a diff summary; the driver merges (`git merge cw/NNN-slug`, then `git worktree remove .driver-seat/wt/NNN-slug`).
 - first fail: copy the task to `NNN-slug-r1.md`, add the findings under **Previous review findings**, and run `cw` with id `NNN-slug-r1`.
 - second fail: escalate. Research → the `research` skill (plan-side Sonnet). Chore → an Agent on `sonnet` with `isolation: "worktree"`, given the task file.
 

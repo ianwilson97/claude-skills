@@ -24,7 +24,7 @@ git init -q $repo && git -C $repo commit -q --allow-empty -m init
 mkdir -p $repo/.driver-seat/tasks $repo/sub
 print -l -- '---' 'job: research' '---' \
   '# What is the latest tmux release? Cite its GitHub release page.' \
-  '## Context' 'Follow the method and output format in ~/.agents/skills/research/SKILL.md; skip its archive step.' \
+  '## Context' 'Follow the method and output format in ~/.agents/skills/research/SKILL.md; write the answer to your result file, not to ~/research/.' \
   '## Done when' '- the result names the version and links the release page' \
   > $repo/.driver-seat/tasks/001-res.md
 print -l -- '---' 'job: chore' 'test: true   # trivial test command' '---' \

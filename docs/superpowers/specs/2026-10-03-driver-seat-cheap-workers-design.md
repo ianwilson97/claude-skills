@@ -100,7 +100,7 @@ test: npm test          # chores only, optional
 <retry only>
 ```
 
-Research tasks add: "Follow the method and output format in `~/.agents/skills/research/SKILL.md`; skip its archive step." (Read as a file, because `--bare` may not load skills.)
+Research tasks add: "Follow the method and output format in `~/.agents/skills/research/SKILL.md`; write the answer to your result file, not to `~/research/`." (Read as a file, because `--bare` may not load skills.)
 
 ### Result file — `.driver-seat/results/<task-id>.md`
 
@@ -139,7 +139,7 @@ The probe's `usage.py`, extended: given a task id, finds the worker transcript (
    - research: re-fetch each load-bearing quote's source and confirm the quoted line exists.
    - chore: `git diff <base>...cw/<task-id>` through `caveman:cavecrew-reviewer`, or `code-review` when branch-sized.
 6. **Outcome.**
-   - pass: research copied to `~/research/YYYY-MM-DD-slug.md` and rendered with `archive.py`, then briefed; chore shown as a diff summary for the driver to merge (`git merge cw/<task-id>`, `git worktree remove`).
+   - pass: research copied to `~/research/YYYY-MM-DD-slug.md`, then briefed; chore shown as a diff summary for the driver to merge (`git merge cw/<task-id>`, `git worktree remove`).
    - first fail: findings appended to the task file, `cw` relaunched as `<task-id>-r1`.
    - second fail: plan-side Sonnet subagent does the task from the same task file.
    - every attempt: one `workers.tsv` row.

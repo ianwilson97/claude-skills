@@ -129,7 +129,7 @@ Before generating "the 7 boring cases" of something, Claude asks whether it's re
 
 Every claim about the outside world — library behaviour, flags, versions, error meanings, best practices — has to come from a search made in that session, with a link. Memory only aims the search.
 
-- **Real questions** go to the `research` skill (or to a cheap worker, see below). Answers come back with quotes and links and are archived to `~/research/` as markdown plus a rendered HTML page.
+- **Real questions** go to the `research` skill (or to a cheap worker, see below). You get a short answer plus a path; the full answer, with quotes and links, is a markdown file in `~/research/`.
 - **Quick facts** inside a briefing get a fast search and an inline citation.
 - **Before longer research**, Claude first gives you 2–3 search queries or primary links, so you can read along. You're delegating the googling, not the understanding.
 - **Confidence is stated.** For odd APIs and platform quirks, Claude says whether it found the best solution or a common workaround.
