@@ -15,8 +15,8 @@ The mode applies to every reply until the driver says "stop driver-seat" or "nor
 
 ## On entry
 
-1. If `.driver-seat/todos/` exists: read the frontmatter of every todo, then brief the `doing` todo (or the next `todo`). After compaction, re-read these files — they are the source of truth, not your memory of the session.
-2. Otherwise ask what we're working on and go to **Planning**.
+1. Read the driver's split from `~/.claude/driver-seat-split.md` if it exists (see **Your split**).
+2. If `.driver-seat/todos/` exists: read the frontmatter of every todo, then brief the `doing` todo (or the next `todo`). After compaction, re-read these files — they are the source of truth, not your memory of the session. Otherwise ask what we're working on and go to **Planning**.
 3. If `cw` is enabled (see **Cheap workers**), reconcile workers. A file in `.driver-seat/results/` with no row in `.driver-seat/workers.tsv` is uncollected: collect it. A pane in `tmux list-panes -t cw:workers -F '#{pane_id} #{@cw}'` with no result is still running or stuck: ask the driver whether to wait or kill it. Your session name may have changed since dispatch, so workers' messages to the old name are lost; the files are the truth.
 
 Done when the driver has either a briefing in hand or a planning conversation under way.
@@ -62,6 +62,8 @@ research: []        # ~/research/... notes this todo leans on
 # <title>
 ## Edit sites
 - `path:line` `symbol` — what changes
+## Interface
+- <signatures the driver agreed: names, parameters, return and error types> (optional; required for red tests)
 ## Pitfalls
 - <pitfall> — <link, if external>
 ## Done when
@@ -95,10 +97,22 @@ When `cw` is enabled, chores run as `cw chore` workers in their own branch and w
 
 ### Your split
 
-<!-- TODO(driver): 5-10 lines. What do you love writing yourself, and what would you rather hand off?
-     The navigator uses this to decide what counts as a chore. -->
+The driver's own split lives in `~/.claude/driver-seat-split.md`, outside this skill, so a personal preference never ships to everyone who installs it. Read it on entry when it exists; it says what the driver loves writing and what they'd rather hand off, and it decides what counts as a chore.
 
-Default until filled in: the driver writes all logic, types, and tests; chores are the list above.
+Default when there is no such file: the driver writes all logic, types, and tests; chores are the list above.
+
+### Red tests first
+
+When the split hands test-writing to the navigator, every todo gets failing tests before the driver starts it.
+
+1. **Interface first.** The todo's `## Interface` must hold signatures the driver agreed on. If it's missing, settle the interface with the driver (it's a design decision) before any test is written: tests encode the API.
+2. **Dispatch** when a todo becomes next, so the tests for todo N+1 are written while the driver codes todo N. With `cw` enabled, write a `cw chore` task with id `NNN-slug-tests`; otherwise use an Agent on `sonnet` with `isolation: "worktree"`. Put the project's test command in the task's `test:` frontmatter. The task says:
+   - Add **stubs**: the `## Interface` signatures copied exactly into the edit-site files, with not-implemented bodies (`raise NotImplementedError`, `panic("not implemented")`, `todo!()`, `abort()`…). No logic: bodies are the driver's.
+   - Write tests for every **Done when** condition, plus the edge cases the pitfalls name. Expected values come from the todo, its research notes, or a spec, never from guesses.
+   - Run the test command. Every new test must fail on an assertion or the not-implemented stub, never on a compile, import or syntax error; existing tests must still pass.
+   - Commit stubs and tests to the worker's branch; the result lists each test with the line its failure shows.
+3. **Review**, plan-side: run the test command in the worker's worktree yourself and confirm the failures match the result. The reviewer checks that tests follow the Done-when and Interface, assert real behaviour (no tautologies), use sourced expected values, and that stubs hold no logic.
+4. **Hand over.** The driver merges the tests branch before starting the todo and reads the tests first: they are the todo's spec. They're a proposal, not the truth: the driver may change any test they disagree with, and a disputed expected value goes back to research.
 
 ## Cheap workers (`cw`)
 
@@ -204,7 +218,7 @@ This mode is the frame; other skills run inside it. When a situation matches, in
 | Coupling smell | `codebase-design` · ✋ `/improve-codebase-architecture` |
 | Domain terms, ADRs | `domain-modeling` |
 | Bug, failing test, slowness | `diagnosing-bugs` or `superpowers:systematic-debugging` — you find root cause + location, driver fixes |
-| Test-first | `tdd` — red tests per **Your split**, driver turns them green |
+| Test-first | **Red tests first** (see **Chores**) when the split asks for it, `tdd` for the method — driver turns them green |
 | Throwaway exploration | `prototype` (throwaway code isn't the driver's codebase) |
 | Past decisions | `claude-mem:mem-search`, `ctx_search` |
 | Work bigger than one session | ✋ `/wayfinder`, `/to-tickets`, `/handoff` |

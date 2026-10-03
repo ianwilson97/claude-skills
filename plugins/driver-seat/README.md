@@ -15,7 +15,7 @@ Use driver-seat when you want to build something **and** stay the person who und
 - [The working loop](#the-working-loop)
 - [What Claude will and won't do](#what-claude-will-and-wont-do)
 - [Files it keeps](#files-it-keeps)
-- [Handing off chores](#handing-off-chores)
+- [Handing off chores](#handing-off-chores) — including [red tests first](#red-tests-first)
 - [Research and receipts](#research-and-receipts)
 - [Reviews](#reviews)
 - [Other skills inside the mode](#other-skills-inside-the-mode)
@@ -102,6 +102,8 @@ research: []        # ~/research/... notes this todo leans on
 # <title>
 ## Edit sites
 - `path:line` `symbol` — what changes
+## Interface
+- <signatures you agreed: names, parameters, return and error types> (optional; needed for red tests)
 ## Pitfalls
 - <pitfall> — <link, if external>
 ## Done when
@@ -123,7 +125,26 @@ Every chore goes through the review cycle before you see it, and Claude reports 
 
 Before generating "the 7 boring cases" of something, Claude asks whether it's really an abstraction (a higher-order function, a table-driven loop, a type-class instance). LLMs default to copy-paste; you probably want readable code.
 
-**Set your own split.** `SKILL.md` has a **Your split** section with a `TODO(driver)` placeholder. Fill in 5–10 lines about what you enjoy writing and what you'd rather hand off, and Claude uses it to decide what counts as a chore. Until then the default is: you write all logic, types and tests.
+**Set your own split.** Write 5–10 lines in `~/.claude/driver-seat-split.md` about what you enjoy writing and what you'd rather hand off; Claude reads it on entry and uses it to decide what counts as a chore. It lives outside the plugin so updates never overwrite it. Without it, the default is: you write all logic, types and tests. Example:
+
+```markdown
+# My split
+- I write all implementation logic and types.
+- Red tests first: before I start a todo, a cheap worker writes the stubs (from the
+  todo's ## Interface) and all its tests, and verifies they fail.
+- I read every test before coding and may change any I disagree with.
+```
+
+### Red tests first
+
+If your split hands test-writing over, every todo gets failing tests before you start it (test-driven development, with you doing the green part):
+
+1. **You agree the interface first.** The todo's `## Interface` lists the signatures. Tests encode the API, so a missing interface is a design question for you, not something the worker guesses.
+2. **A worker writes stubs and tests.** Stubs are your agreed signatures copied exactly, with not-implemented bodies (`raise NotImplementedError`, `panic("not implemented")`, `todo!()`…), so each test fails on its own assertion instead of on a compile or import error (in C, Go or Rust one missing symbol would stop the whole test build). Tests cover every **Done when** condition and the edge cases the pitfalls name.
+3. **It runs them and confirms they fail for the right reason**, and existing tests still pass. Claude re-runs them on its side and reviews the tests before you see them.
+4. **You merge the tests branch and read the tests first.** They're the spec for the todo. They're also a proposal: change any test you disagree with.
+
+The tests for the next todo are written while you code the current one, so you don't wait. With `cw` enabled this runs on the cheap model (task `NNN-slug-tests`); otherwise on a Sonnet subagent.
 
 ## Research and receipts
 
@@ -247,7 +268,8 @@ The live test needs a repo that Claude Code already trusts, because Claude Code 
 
 ## Tips for using it well
 
-- **Fill in "Your split"** before your first real session. It's the biggest lever on how much Claude does versus you.
+- **Write your split** (`~/.claude/driver-seat-split.md`) before your first real session. It's the biggest lever on how much Claude does versus you.
+- **Agree each todo's interface during planning** if you use red tests first; it's what the tests are written against.
 - **Bring a spec.** A one-page description of the goal and constraints makes the planning round short and the todos sharp.
 - **Answer the decision questions.** If a question doesn't give you enough to decide, say so; Claude should add context rather than decide for you.
 - **Edit the todo files freely.** They're plain markdown and Claude re-reads them.
