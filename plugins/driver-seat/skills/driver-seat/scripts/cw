@@ -59,13 +59,14 @@ if [[ $job == research ]]; then
   [[ $mode == launch ]] && model=$CW_RESEARCH_MODEL
   # cwd .driver-seat: acceptEdits then auto-approves edits there only, never in the driver's code
   dir=$ds
-  tools=(Read Grep Glob Write Edit WebFetch WebSearch ListAgents SendMessage)
+  tools=(Read Grep Glob Write Edit WebFetch WebSearch Skill ListAgents SendMessage)
   # denied, not just unlisted: an unlisted shell call waits on a permission prompt nobody answers
-  deny=(--disallowedTools Bash)
+  deny=(Bash)
 else
   [[ $mode == launch ]] && model=$CW_CHORE_MODEL
+  deny=()
   dir=$ds/wt/$id
-  tools=(Read Grep Glob Write Edit 'Bash(git status:*)' 'Bash(git diff:*)' 'Bash(git add:*)' 'Bash(git commit:*)' ListAgents SendMessage)
+  tools=(Read Grep Glob Write Edit 'Bash(git status:*)' 'Bash(git diff:*)' 'Bash(git add:*)' 'Bash(git commit:*)' Skill ListAgents SendMessage)
   # `test:` from the frontmatter only, trailing comment dropped
   test_cmd=$(awk '/^---$/ {n++; next} n > 1 {exit} n == 1 && sub(/^test:[ \t]*/, "") {sub(/[ \t]+#.*$/, ""); print; exit}' $task)
   [[ -n $test_cmd ]] && tools+=("Bash($test_cmd:*)")
@@ -89,6 +90,13 @@ When done, SendMessage to $boss: \"done $id\" plus a summary of at most 5 lines.
     # no --bare: it turns off cross-session messaging. Skipping user settings drops the user's hooks
     # and plugins instead (Phase 0).
     lean=(--model sonnet --setting-sources project,local)
+    # The driver's own skills without the rest of user settings: a folder holding only .claude/skills
+    # (a link to ~/.claude/skills), added with --add-dir. Edits there are denied: acceptEdits would
+    # auto-approve them, and the link leads to the real skills.
+    S=$HOME/.claude/cw-skills
+    [[ -n $CW_DRY_RUN ]] || { mkdir -p $S/.claude && ln -sfn $HOME/.claude/skills $S/.claude/skills }
+    skills=($S)
+    deny+=("Edit(/$S/**)" "Edit(/$HOME/.claude/skills/**)" "Edit(/$HOME/.agents/skills/**)")
   else
     # Bedrock's env (CLAUDE_CODE_USE_BEDROCK, AWS_*) lives in user settings: they must load.
     # The model is a Claude Code alias (haiku/sonnet/opus) or a Bedrock model id.
@@ -96,7 +104,7 @@ When done, SendMessage to $boss: \"done $id\" plus a summary of at most 5 lines.
   fi
   # --permission-mode stays last: --allowedTools and --add-dir are variadic and would swallow the prompt.
   cmd=(claude -n cw-$id $lean --strict-mcp-config
-       --allowedTools ${(j:,:)tools} $deny --add-dir $ds --permission-mode acceptEdits $prompt)
+       --allowedTools ${(j:,:)tools} ${deny:+--disallowedTools} $deny --add-dir $ds $skills --permission-mode acceptEdits $prompt)
   [[ -n $CW_DRY_RUN ]] && { print -l -- "model=$model" $cmd; exit 0 }
   exec command $cmd  # `command`: skip any `claude` shell function, e.g. one defined in ~/.zshenv
 fi

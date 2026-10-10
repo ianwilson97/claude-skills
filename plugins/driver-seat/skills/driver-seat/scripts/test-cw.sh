@@ -74,7 +74,9 @@ check "body test: line is ignored"      '[[ -n $chore && $chore != *this-line-is
 check "research cannot git commit"      '[[ -n $research && $research != *"git commit"* ]]'
 check "research cannot run curl"        '[[ -n $research && $research != *curl* ]]'
 check "research denies the shell"       '[[ $research == *"${nl}--disallowedTools${nl}Bash${nl}"* && $research == *"You have no shell"* ]]'
-check "chore keeps its shell"           '[[ -n $chore && $chore != *--disallowedTools* ]]'
+check "chore keeps its shell"           '[[ -n $chore && $chore != *"--disallowedTools${nl}Bash"* ]]'
+check "skills folder added, read-only"   '[[ $chore == *"${nl}--add-dir${nl}$real/.driver-seat${nl}$HOME/.claude/cw-skills${nl}"* && $chore == *"${nl}Edit(/$HOME/.claude/skills/**)${nl}"* ]]'
+check "workers may use skills"          '[[ $chore == *",Skill,"* && $research == *",Skill,"* ]]'
 check "research prompt marks repo read-only" '[[ $research == *"Repo under study: $real (read it, never edit it)."* ]]'
 check "lean flags present"              '[[ $chore == *"${nl}--setting-sources${nl}project,local${nl}--strict-mcp-config${nl}"* ]]'
 check "prompt follows permission mode"  '[[ $chore == *"${nl}--permission-mode${nl}acceptEdits${nl}You are cw-002-chore, a chore worker for boss."* ]]'
@@ -90,7 +92,7 @@ check "switches read from the mod's settings" '[[ $(CW_SETTINGS=$tmp/settings.js
 check "env overrides the settings"      '[[ $(CW_SETTINGS=$tmp/settings.json CW_LAUNCH=panes z research 001-res boss) == *"${nl}launch=panes${nl}"* ]]'
 check "default is openrouter + panes"   '[[ $(z research 001-res boss) == *"${nl}provider=openrouter${nl}launch=panes${nl}model=deepseek/"* ]]'
 bchore=$(z --run chore 002-chore boss $real opus bedrock)
-check "bedrock run keeps user settings" '[[ -n $bchore && $bchore != *--setting-sources* ]]'
+check "bedrock run keeps user settings" '[[ -n $bchore && $bchore != *--setting-sources* && $bchore != *cw-skills* ]]'
 check "bedrock run passes the alias"    '[[ $bchore == *"${nl}--model${nl}opus${nl}--strict-mcp-config${nl}"* ]]'
 check "run without provider is openrouter" '[[ $chore == *"${nl}--model${nl}sonnet${nl}--setting-sources${nl}"* ]]'
 
