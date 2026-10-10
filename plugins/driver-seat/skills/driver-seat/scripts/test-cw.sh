@@ -5,6 +5,8 @@
 #           in Claude Code: Claude Code never pre-trusts a new repo, so live runs reuse this one.
 here=${0:A:h}
 cw=$here/cw
+# the real /config choices (provider, launch) must not leak into these checks
+export CW_SETTINGS=/dev/null; unset CW_PROVIDER CW_LAUNCH
 fails=0 owned=0 nl=$'\n'
 check() { if eval "$2"; then print -- "ok   $1"; else print -- "FAIL $1"; (( fails++ )); fi }
 st() { "$@" >/dev/null 2>&1; print $? }
@@ -77,6 +79,20 @@ check "research prompt marks repo read-only" '[[ $research == *"Repo under study
 check "lean flags present"              '[[ $chore == *"${nl}--setting-sources${nl}project,local${nl}--strict-mcp-config${nl}"* ]]'
 check "prompt follows permission mode"  '[[ $chore == *"${nl}--permission-mode${nl}acceptEdits${nl}You are cw-002-chore, a chore worker for boss."* ]]'
 check "result path in prompt"           '[[ $chore == *"Write your result to $real/.driver-seat/results/002-chore.md."* ]]'
+
+# provider + launch: the switches shared with the cheap-worker mod
+print -r -- '{"pluginConfigs":{"cheap-worker@inline":{"options":{"provider":"bedrock","launch":"tabs"}}}}' > $tmp/settings.json
+b() { CW_DRY_RUN=1 CW_PROVIDER=bedrock zsh -f $cw "$@" }
+check "--check is on for bedrock without key" '[[ $(st env -u CW_OPENROUTER_API_KEY CW_PROVIDER=bedrock zsh -f $cw --check) == 0 ]]'
+check "bedrock launch needs no key"     '[[ $(env -u CW_OPENROUTER_API_KEY CW_DRY_RUN=1 CW_PROVIDER=bedrock zsh -f $cw research 001-res boss) == *"${nl}provider=bedrock${nl}launch=panes${nl}model=haiku" ]]'
+check "bedrock chores default to sonnet" '[[ $(b chore 002-chore boss) == *"${nl}model=sonnet" ]]'
+check "switches read from the mod's settings" '[[ $(CW_SETTINGS=$tmp/settings.json z research 001-res boss) == *"${nl}provider=bedrock${nl}launch=tabs${nl}"* ]]'
+check "env overrides the settings"      '[[ $(CW_SETTINGS=$tmp/settings.json CW_LAUNCH=panes z research 001-res boss) == *"${nl}launch=panes${nl}"* ]]'
+check "default is openrouter + panes"   '[[ $(z research 001-res boss) == *"${nl}provider=openrouter${nl}launch=panes${nl}model=deepseek/"* ]]'
+bchore=$(z --run chore 002-chore boss $real opus bedrock)
+check "bedrock run keeps user settings" '[[ -n $bchore && $bchore != *--setting-sources* ]]'
+check "bedrock run passes the alias"    '[[ $bchore == *"${nl}--model${nl}opus${nl}--strict-mcp-config${nl}"* ]]'
+check "run without provider is openrouter" '[[ $chore == *"${nl}--model${nl}sonnet${nl}--setting-sources${nl}"* ]]'
 
 if (( live )); then
   [[ -n ${CW_OPENROUTER_API_KEY:-} ]] || { print "live: CW_OPENROUTER_API_KEY is unset"; exit 1 }

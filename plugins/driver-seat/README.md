@@ -205,7 +205,18 @@ In testing with the default model (`deepseek/deepseek-v4.1-flash`), a research t
 3. Install tmux (tested with 3.7) and use a git repo for your project.
 4. To watch workers, split your terminal (Ghostty: **Cmd+D**) and run `tmux new -A -s cw` in the new split.
 
-Without the key (for example on a work machine where cost doesn't matter), driver-seat behaves exactly as without `cw`. `scripts/cw --check` exits 0 when `cw` is enabled.
+Without the key, and with the provider left at `openrouter`, driver-seat behaves exactly as without `cw`. `scripts/cw --check` exits 0 when `cw` is enabled.
+
+### Bedrock and tabs (e.g. a work machine)
+
+`cw` reads the same two switches as the [cheap-worker mod](https://github.com/ianwilson97/claude-mods)'s `/config` (environment variables `CW_PROVIDER` and `CW_LAUNCH` override them):
+
+| Switch | Values |
+|---|---|
+| `provider` | `openrouter` (default): the key above, any model. `bedrock`: Claude via Amazon Bedrock, using the Bedrock config in your user settings; no key needed. Research runs on `haiku`, chores on `sonnet`. |
+| `launch` | `panes` (default): all workers tiled in tmux session `cw`. `tabs`: each worker gets tmux session `cw-NNN-slug` and opens in a background tab (cmux when Claude runs inside cmux, else Ghostty 1.3+; macOS asks once to allow controlling Ghostty). |
+
+From any terminal, `crew` lists running workers and `crew NNN-slug` attaches to one (installed to `~/.local/bin` by the cheap-worker mod; `tmux attach -t cw-NNN-slug` works without it).
 
 ### How a task flows
 
@@ -220,7 +231,7 @@ Without the key (for example on a work machine where cost doesn't matter), drive
 
 | Do | How |
 |---|---|
-| See all workers | the `cw` split (`tmux new -A -s cw`) |
+| See all workers | the `cw` split (`tmux new -A -s cw`); tabs mode: each worker's tab, or `crew` |
 | Focus a worker | click its pane |
 | Prompt a worker | type into its Claude input, like any session |
 | Full-screen one / back | `Ctrl-b z` |
@@ -239,7 +250,7 @@ If you started Claude itself inside tmux, use `tmux switch-client -t cw` (or `pr
 
 Every attempt is logged in `.driver-seat/workers.tsv` (model, tokens, cost, verdict, escalation). The first 5 research tasks also run on your plan as a **shadow** comparison. After 10 tasks of a kind, if 20% or more needed escalation, Claude suggests a different model.
 
-To change models, export `CW_RESEARCH_MODEL` and/or `CW_CHORE_MODEL` (any OpenRouter model id that supports tool calling) in `~/.zshenv`, or edit the two variables at the top of `scripts/cw`.
+To change models, export `CW_RESEARCH_MODEL` and/or `CW_CHORE_MODEL` in `~/.zshenv` (OpenRouter: any model id that supports tool calling; Bedrock: `haiku`, `sonnet`, `opus` or a Bedrock model id), or edit the defaults at the top of `scripts/cw`.
 
 ### What workers can and can't do
 

@@ -17,7 +17,7 @@ The mode applies to every reply until the driver says "stop driver-seat" or "nor
 
 1. Read the driver's split from `~/.claude/driver-seat-split.md` if it exists (see **Your split**).
 2. If `.driver-seat/todos/` exists: read the frontmatter of every todo, then brief the `doing` todo (or the next `todo`). After compaction, re-read these files — they are the source of truth, not your memory of the session. Otherwise ask what we're working on and go to **Planning**.
-3. If `cw` is enabled (see **Cheap workers**), reconcile workers. A file in `.driver-seat/results/` with no row in `.driver-seat/workers.tsv` is uncollected: collect it. A pane in `tmux list-panes -t cw:workers -F '#{pane_id} #{@cw}'` with no result is still running or stuck: ask the driver whether to wait or kill it. Your session name may have changed since dispatch, so workers' messages to the old name are lost; the files are the truth.
+3. If `cw` is enabled (see **Cheap workers**), reconcile workers. A file in `.driver-seat/results/` with no row in `.driver-seat/workers.tsv` is uncollected: collect it. A pane in `tmux list-panes -a -F '#{pane_id} #{@cw}'` labelled `cw-…` with no result is still running or stuck: ask the driver whether to wait or kill it. Your session name may have changed since dispatch, so workers' messages to the old name are lost; the files are the truth.
 
 Done when the driver has either a briefing in hand or a planning conversation under way.
 
@@ -116,13 +116,20 @@ When the split hands test-writing to the navigator, every todo gets failing test
 
 ## Cheap workers (`cw`)
 
-Research and chores can run off-plan on a cheap pinned OpenRouter model, each as a fresh Claude Code session in a tmux pane that reports back by message. Once per session run `${CLAUDE_SKILL_DIR}/scripts/cw --check`: exit 0 means enabled; anything else means skip this section and use plan-side subagents as before.
+Research and chores can run off-plan on a cheap pinned model, each as a fresh Claude Code session in tmux that reports back by message. Once per session run `${CLAUDE_SKILL_DIR}/scripts/cw --check`: exit 0 means enabled; anything else means skip this section and use plan-side subagents as before.
+
+`cw` follows the same two switches as the cheap-worker mod's `/config` (`CW_PROVIDER` / `CW_LAUNCH` override them):
+
+- **provider** `openrouter` (any OpenRouter model, needs `CW_OPENROUTER_API_KEY`) or `bedrock` (Claude via Amazon Bedrock; models are `haiku` for research and `sonnet` for chores unless overridden).
+- **launch** `panes` (tiled in tmux session `cw`) or `tabs` (one tmux session `cw-NNN-slug` per worker, opened as a background cmux or Ghostty tab).
+
+Either way `crew NNN-slug` attaches to a worker from any terminal, and the mod's `/workers`, `/progress` and `/map` views list cw workers alongside its own.
 
 **Dispatch.**
 1. Write `.driver-seat/tasks/NNN-slug.md` from the template below. The worker never sees this conversation: put every fact it needs under **Context**.
 2. Run `${CLAUDE_SKILL_DIR}/scripts/cw <research|chore> NNN-slug <your session name>`. Your name is the first line of `ListAgents`. Keep the pane id it prints. Exit 1 means the worker didn't start: log verdict `infra`, relaunch once, then do the task plan-side (see **Outcome**).
 3. `SendMessage(to: "cw-NNN-slug", notify_when_idle: true)` with no message, as the backstop if the worker never reports.
-4. Tell the driver in one line that worker `cw-NNN-slug` is running and `tmux new -A -s cw` shows it.
+4. Tell the driver in one line that worker `cw-NNN-slug` is running: in tabs mode its tab is open (if `cw` warned it couldn't open one: CMD+T, then `crew NNN-slug`); in panes mode `tmux new -A -s cw` shows it.
 
 ```markdown
 ---
@@ -167,7 +174,7 @@ The five columns from `model` to `cost_usd` are `cw_usage.py`'s output. `verdict
 
 **Shadow run.** While fewer than 5 research rows have a shadow value, also run the `research` skill on the same question and compare: same answer, receipts valid? Record `agree` or `disagree`.
 
-**Is it working?** After 10 tasks of a job: if 20% or more of them were escalated (`infra` excluded), tell the driver and suggest a different model via `CW_RESEARCH_MODEL` or `CW_CHORE_MODEL`.
+**Is it working?** After 10 tasks of a job: if 20% or more of them were escalated (`infra` excluded), tell the driver and suggest a different model via `CW_RESEARCH_MODEL` or `CW_CHORE_MODEL` (on Bedrock: a bigger alias, e.g. research on `sonnet`).
 
 ## Review cycle
 

@@ -1,23 +1,46 @@
 #!/bin/zsh
-# cw — run one driver-seat research/chore task on a cheap pinned OpenRouter model,
-# as an interactive Claude Code worker in a tiled tmux pane (session `cw`, window `workers`).
+# cw — run one driver-seat research/chore task on a cheap pinned model, as an interactive
+# Claude Code worker in tmux.
 #
 #   cw --check                                 exit 0 if cw is enabled on this machine
 #   cw <research|chore> <id> <boss>            launch worker cw-<id>; prints its tmux pane id
-#   cw --run <job> <id> <boss> <repo> <model>  (inside the pane) exec the worker
+#   cw --run <job> <id> <boss> <repo> <model> [<provider>]  (inside the pane) exec the worker
+#
+# Two switches, shared with the cheap-worker mod's /config (CW_PROVIDER / CW_LAUNCH override them):
+#   provider  openrouter  any OpenRouter model, key from $CW_OPENROUTER_API_KEY (default)
+#             bedrock     Claude via Amazon Bedrock: workers keep user settings, where its env lives
+#   launch    panes       tiled in tmux session `cw`, window `workers` (default)
+#             tabs        a tmux session `cw-<id>` per worker, opened as a background cmux or
+#                         Ghostty tab; `crew <id>` attaches from any terminal
 #
 # CW_DRY_RUN=1 validates and prints instead of touching git/tmux/claude (used by test-cw.sh).
-# ponytail: models are two variables, not a config file.
-CW_RESEARCH_MODEL=${CW_RESEARCH_MODEL:-deepseek/deepseek-v4.1-flash}
-CW_CHORE_MODEL=${CW_CHORE_MODEL:-deepseek/deepseek-v4.1-flash}
-
 die() { print -u2 -- "cw: $1"; exit ${2:-2} }
 
-[[ $1 == --check ]] && { [[ -n $CW_OPENROUTER_API_KEY ]] && (( $+commands[tmux] )); exit }
+# The mod's saved option: plugin key `cheap-worker` (marketplace install) or `cheap-worker@inline` (plugin dir).
+setting() {
+  local f=${CW_SETTINGS:-$HOME/.claude/settings.json} k
+  for k in cheap-worker cheap-worker@inline; do
+    plutil -extract "pluginConfigs.$k.options.$1" raw -o - $f 2>/dev/null && return
+  done
+}
+provider=${CW_PROVIDER:-$(setting provider)}; [[ $provider == bedrock ]] || provider=openrouter
+launch=${CW_LAUNCH:-$(setting launch)}; [[ $launch == tabs ]] || launch=panes
+
+# ponytail: models are two variables, not a config file.
+if [[ $provider == bedrock ]]; then
+  CW_RESEARCH_MODEL=${CW_RESEARCH_MODEL:-haiku} CW_CHORE_MODEL=${CW_CHORE_MODEL:-sonnet}
+else
+  CW_RESEARCH_MODEL=${CW_RESEARCH_MODEL:-deepseek/deepseek-v4.1-flash}
+  CW_CHORE_MODEL=${CW_CHORE_MODEL:-deepseek/deepseek-v4.1-flash}
+fi
+
+[[ $1 == --check ]] && { (( $+commands[tmux] )) && [[ $provider == bedrock || -n $CW_OPENROUTER_API_KEY ]]; exit }
 
 if [[ $1 == --run ]]; then
-  (( $# == 6 )) || die "usage: cw --run <job> <task-id> <orchestrator-name> <repo> <model>"
+  (( $# == 6 || $# == 7 )) || die "usage: cw --run <job> <task-id> <orchestrator-name> <repo> <model> [<provider>]"
   mode=run job=$2 id=$3 boss=$4 repo=$5 model=$6
+  # a pane gets the tmux server's env, not the launcher's: the provider travels as an argument
+  provider=${7:-openrouter}
 else
   (( $# == 3 )) || die "usage: cw <research|chore> <task-id> <orchestrator-name>"
   mode=launch job=$1 id=$2 boss=$3
@@ -27,7 +50,7 @@ fi
 
 [[ $job == (research|chore) ]] || die "job must be research or chore, got '$job'"
 [[ $id =~ '^[0-9]{3}-[a-z0-9-]+$' ]] || die "task id must look like 012-slug, got '$id'"
-[[ -n $CW_OPENROUTER_API_KEY ]] || die "CW_OPENROUTER_API_KEY unset: cw is off on this machine"
+[[ $provider == bedrock || -n $CW_OPENROUTER_API_KEY ]] || die "CW_OPENROUTER_API_KEY unset: cw is off on this machine"
 ds=$repo/.driver-seat
 task=$ds/tasks/$id.md
 [[ -f $task ]] || die "missing task file $task"
@@ -59,13 +82,20 @@ Scratch files go in $ds/tmp/ only.
 Write your result to $ds/results/$id.md.
 If blocked, SendMessage to $boss: \"blocked $id: <question>\" and wait.
 When done, SendMessage to $boss: \"done $id\" plus a summary of at most 5 lines."
-  export ANTHROPIC_BASE_URL=https://openrouter.ai/api ANTHROPIC_AUTH_TOKEN=$CW_OPENROUTER_API_KEY ANTHROPIC_API_KEY=
-  export ANTHROPIC_DEFAULT_OPUS_MODEL=$model ANTHROPIC_DEFAULT_SONNET_MODEL=$model
-  export ANTHROPIC_DEFAULT_HAIKU_MODEL=$model CLAUDE_CODE_SUBAGENT_MODEL=$model
-  # no --bare: it turns off cross-session messaging. Skipping user settings drops the user's hooks
-  # and plugins instead (Phase 0). --permission-mode stays last: --allowedTools and --add-dir are
-  # variadic and would swallow the prompt.
-  cmd=(claude -n cw-$id --model sonnet --setting-sources project,local --strict-mcp-config
+  if [[ $provider == openrouter ]]; then
+    export ANTHROPIC_BASE_URL=https://openrouter.ai/api ANTHROPIC_AUTH_TOKEN=$CW_OPENROUTER_API_KEY ANTHROPIC_API_KEY=
+    export ANTHROPIC_DEFAULT_OPUS_MODEL=$model ANTHROPIC_DEFAULT_SONNET_MODEL=$model
+    export ANTHROPIC_DEFAULT_HAIKU_MODEL=$model CLAUDE_CODE_SUBAGENT_MODEL=$model
+    # no --bare: it turns off cross-session messaging. Skipping user settings drops the user's hooks
+    # and plugins instead (Phase 0).
+    lean=(--model sonnet --setting-sources project,local)
+  else
+    # Bedrock's env (CLAUDE_CODE_USE_BEDROCK, AWS_*) lives in user settings: they must load.
+    # The model is a Claude Code alias (haiku/sonnet/opus) or a Bedrock model id.
+    lean=(--model $model)
+  fi
+  # --permission-mode stays last: --allowedTools and --add-dir are variadic and would swallow the prompt.
+  cmd=(claude -n cw-$id $lean --strict-mcp-config
        --allowedTools ${(j:,:)tools} $deny --add-dir $ds --permission-mode acceptEdits $prompt)
   [[ -n $CW_DRY_RUN ]] && { print -l -- "model=$model" $cmd; exit 0 }
   exec command $cmd  # `command`: skip any `claude` shell function, e.g. one defined in ~/.zshenv
@@ -76,7 +106,7 @@ if [[ $job == chore ]]; then
   [[ -e $dir ]] && die "$dir already exists"
 fi
 base=$(git -C $repo rev-parse HEAD)
-[[ -n $CW_DRY_RUN ]] && { print -l -- "repo=$repo" "dir=$dir" "base=$base" "model=$model"; exit 0 }
+[[ -n $CW_DRY_RUN ]] && { print -l -- "repo=$repo" "dir=$dir" "base=$base" "provider=$provider" "launch=$launch" "model=$model"; exit 0 }
 
 # from here on a failure undoes the chore's branch and worktree, so the relaunch starts clean
 fail() {
@@ -92,9 +122,12 @@ mkdir -p $ds/results $ds/tmp $common/info
 grep -qx '.driver-seat/' $common/info/exclude 2>/dev/null || print '.driver-seat/' >> $common/info/exclude
 [[ $job == chore ]] && { git -C $repo worktree add -q -b cw/$id $dir $base || die "git worktree add failed" 1 }
 
-# the model travels in the run string: a tmux pane gets the server's env, not this caller's
-run="exec ${(q)${0:A}} --run $job $id ${(q)boss} ${(q)repo} ${(q)model}"
-if ! tmux has-session -t cw 2>/dev/null; then
+# model and provider travel in the run string: a tmux pane gets the server's env, not this caller's
+run="exec ${(q)${0:A}} --run $job $id ${(q)boss} ${(q)repo} ${(q)model} $provider"
+if [[ $launch == tabs ]]; then
+  tmux has-session -t "=cw-$id" 2>/dev/null && fail "tmux session cw-$id already exists"
+  pane=$(tmux new-session -d -s cw-$id -x 200 -y 50 -c $dir -P -F '#{pane_id}' $run)
+elif ! tmux has-session -t cw 2>/dev/null; then
   pane=$(tmux new-session -d -s cw -n workers -x 200 -y 50 -c $dir -P -F '#{pane_id}' $run)
 elif ! tmux list-windows -t cw -F '#W' | grep -qx workers; then
   pane=$(tmux new-window -t cw: -n workers -c $dir -P -F '#{pane_id}' $run)
@@ -102,9 +135,46 @@ else
   pane=$(tmux split-window -d -t cw:workers -c $dir -P -F '#{pane_id}' $run)
 fi
 [[ -n $pane ]] || fail "tmux could not open a pane"
-tmux set -p -t $pane @cw cw-$id \; set -t cw mouse on \; \
-  set -w -t cw:workers pane-border-status top \; set -w -t cw:workers pane-border-format ' #{@cw} ' \; \
-  set -w -t cw:workers remain-on-exit on \; select-layout -t cw:workers tiled
+# the cheap-worker mod's tags: its /workers, /progress and /map views and `crew` list these panes too
+[[ $provider == bedrock ]] && tag=anthropic/$model || tag=$model
+tmux set -p -t $pane @cw cw-$id \; set -p -t $pane @cw_model $tag \; set -p -t $pane @cw_mode acceptEdits \; \
+  set -p -t $pane @cw_start $(( $(date +%s) * 1000 )) \; set -p -t $pane @cw_cwd $dir \; set -p -t $pane @cw_task "$job $id"
+if [[ $launch == tabs ]]; then
+  tmux set -w -t "=cw-$id:" remain-on-exit on
+else
+  tmux set -t cw mouse on \; \
+    set -w -t cw:workers pane-border-status top \; set -w -t cw:workers pane-border-format ' #{@cw} ' \; \
+    set -w -t cw:workers remain-on-exit on \; select-layout -t cw:workers tiled
+fi
+
+# A background tab attached to session $1: cmux's CLI inside cmux, else Ghostty's AppleScript.
+# tmux by absolute path (a tab's command gets no Homebrew PATH); '=…' quoted (zsh expands a bare =word).
+open_tab() {
+  local tp=${commands[tmux]} ref cm=${CMUX_BUNDLED_CLI_PATH:-cmux}
+  if [[ -n ${CMUX_WORKSPACE_ID:-} ]]; then
+    ref=$($cm new-surface --type terminal --focus false 2>/dev/null | grep -o 'surface:[0-9]*' | head -1)
+    [[ -n $ref ]] || return 1
+    $cm rename-tab --surface $ref $1 >/dev/null 2>&1
+    $cm send --surface $ref "$tp attach -t '=$1'"$'\n' >/dev/null 2>&1
+    return
+  fi
+  # the first run waits on macOS's "allow control of Ghostty?" dialog: give up after 15 s
+  osascript -e "tell application \"Ghostty\"
+    set cfg to new surface configuration
+    set command of cfg to \"$tp attach -t =$1\"
+    if (count of windows) is 0 then
+      new window with configuration cfg
+    else
+      set w to front window
+      set here to selected tab of w
+      new tab in w with configuration cfg
+      select tab here
+    end if
+  end tell" >/dev/null 2>&1 &
+  local p=$!
+  ( sleep 15; kill $p ) >/dev/null 2>&1 &
+  wait $p
+}
 
 pp=$(tmux display -p -t $pane '#{pane_pid}')
 clean=0
@@ -116,7 +186,10 @@ for i in {1..30}; do
   # Claude Code names its messaging socket after its pid: the pane process, or its child when a
   # shell function or PATH shim sits in between (Phase 0 check 6)
   for p in $pp $(pgrep -P $pp); do
-    [[ -S /tmp/cc-socks/$p.sock ]] && (( ++clean >= 2 )) && { print -- $pane; exit 0 }
+    if [[ -S /tmp/cc-socks/$p.sock ]] && (( ++clean >= 2 )); then
+      [[ $launch == tabs ]] && ! open_tab cw-$id && print -u2 -- "cw: no tab opened; reach it with CMD+T, then: crew $id"
+      print -- $pane; exit 0
+    fi
   done
 done
 print -u2 -- $screen
