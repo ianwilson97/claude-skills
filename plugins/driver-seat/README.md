@@ -214,7 +214,7 @@ Without the key, and with the provider left at `openrouter`, driver-seat behaves
 | Switch | Values |
 |---|---|
 | `provider` | `openrouter` (default): the key above, any model. `bedrock`: Claude via Amazon Bedrock, using the Bedrock config in your user settings; no key needed. Research runs on `haiku`, chores on `sonnet`. |
-| `launch` | `panes` (default): all workers tiled in tmux session `cw`. `tabs`: each worker gets tmux session `cw-NNN-slug` and opens in a background tab (cmux when Claude runs inside cmux, else Ghostty 1.3+; macOS asks once to allow controlling Ghostty). |
+| `launch` | `panes` (default): all workers tiled in tmux session `cw`. `tabs`: each worker gets tmux session `cw-NNN-slug` and opens in a background tab (Herdr or cmux when Claude runs inside one, else Ghostty 1.3+; macOS asks once to allow controlling Ghostty). |
 
 From any terminal, `crew` lists running workers and `crew NNN-slug` attaches to one (installed to `~/.local/bin` by the cheap-worker mod; `tmux attach -t cw-NNN-slug` works without it).
 

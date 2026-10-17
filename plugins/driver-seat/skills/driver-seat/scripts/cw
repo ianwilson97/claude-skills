@@ -155,10 +155,18 @@ else
     set -w -t cw:workers remain-on-exit on \; select-layout -t cw:workers tiled
 fi
 
-# A background tab attached to session $1: cmux's CLI inside cmux, else Ghostty's AppleScript.
+# A background tab attached to session $1: Herdr's or cmux's CLI when inside one (Herdr first: it
+# runs inside cmux or Ghostty), else Ghostty's AppleScript.
 # tmux by absolute path (a tab's command gets no Homebrew PATH); '=…' quoted (zsh expands a bare =word).
 open_tab() {
-  local tp=${commands[tmux]} ref cm=${CMUX_BUNDLED_CLI_PATH:-cmux}
+  local tp=${commands[tmux]} ref cm=${CMUX_BUNDLED_CLI_PATH:-cmux} hd=${HERDR_BIN_PATH:-herdr}
+  if [[ -n ${HERDR_WORKSPACE_ID:-} ]]; then
+    # `tab create` answers JSON; the new tab's shell is result.root_pane.pane_id (e.g. w5:p2)
+    ref=$($hd tab create --workspace $HERDR_WORKSPACE_ID --label $1 2>/dev/null | grep -o '"pane_id":"[^"]*"' | head -1 | cut -d'"' -f4)
+    [[ -n $ref ]] || return 1
+    $hd pane run $ref "$tp attach -t '=$1'" >/dev/null 2>&1
+    return
+  fi
   if [[ -n ${CMUX_WORKSPACE_ID:-} ]]; then
     ref=$($cm new-surface --type terminal --focus false 2>/dev/null | grep -o 'surface:[0-9]*' | head -1)
     [[ -n $ref ]] || return 1

@@ -121,7 +121,7 @@ Research and chores can run off-plan on a cheap pinned model, each as a fresh Cl
 `cw` follows the same two switches as the cheap-worker mod's `/config` (`CW_PROVIDER` / `CW_LAUNCH` override them):
 
 - **provider** `openrouter` (any OpenRouter model, needs `CW_OPENROUTER_API_KEY`) or `bedrock` (Claude via Amazon Bedrock; models are `haiku` for research and `sonnet` for chores unless overridden).
-- **launch** `panes` (tiled in tmux session `cw`) or `tabs` (one tmux session `cw-NNN-slug` per worker, opened as a background cmux or Ghostty tab).
+- **launch** `panes` (tiled in tmux session `cw`) or `tabs` (one tmux session `cw-NNN-slug` per worker, opened as a background Herdr, cmux or Ghostty tab).
 
 Either way `crew NNN-slug` attaches to a worker from any terminal, and the mod's `/workers`, `/progress` and `/map` views list cw workers alongside its own.
 
