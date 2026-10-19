@@ -116,6 +116,9 @@ check "remote refusal is not a local fallback" '[[ $(STUB_EXIT=2 st r chore 002-
 rerr=$(CW_LAUNCH=remote z research 001-res boss 2>&1 >/dev/null)
 check "research under remote runs locally" '[[ $(CW_LAUNCH=remote z research 001-res boss 2>/dev/null) == *"${nl}launch=panes${nl}"* && $rerr == *"cw: research runs locally; remote is for general workers"* ]]'
 check "remote without cw-remote refuses" '[[ $(st env -u CW_OPENROUTER_API_KEY PATH=$fake:$PATH CW_LAUNCH=remote CW_REMOTE=/nonexistent zsh -f $cw chore 002-chore boss) == 2 && ! -e $tmp/tmux.log ]]'
+check "--check is on for remote without a key (m-13)" '[[ $(st env -u CW_OPENROUTER_API_KEY PATH=$fake:$PATH CW_LAUNCH=remote CW_REMOTE=$fake/cw-remote zsh -f $cw --check) == 0 ]]'
+check "--check is off for remote without cw-remote" '[[ $(st env -u CW_OPENROUTER_API_KEY PATH=$fake:$PATH CW_LAUNCH=remote CW_REMOTE=/nonexistent zsh -f $cw --check) == 1 ]]'
+check "remote refuses bedrock (m-9)" '[[ $(st env PATH=$fake:$PATH CW_PROVIDER=bedrock CW_LAUNCH=remote CW_REMOTE=$fake/cw-remote zsh -f $cw chore 002-chore boss) == 2 && ! -e $tmp/tmux.log ]]'
 
 if (( live )); then
   [[ -n ${CW_OPENROUTER_API_KEY:-} ]] || { print "live: CW_OPENROUTER_API_KEY is unset"; exit 1 }

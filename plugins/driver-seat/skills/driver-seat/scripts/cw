@@ -37,6 +37,8 @@ else
   CW_CHORE_MODEL=${CW_CHORE_MODEL:-deepseek/deepseek-v4.1-flash}
 fi
 
+# remote: chores need only cw-remote (the sprite brings its own tmux and model access)
+[[ $1 == --check && $launch == remote ]] && { [[ -x ${CW_REMOTE:-$HOME/.local/bin/cw-remote} ]]; exit }
 [[ $1 == --check ]] && { (( $+commands[tmux] )) && [[ $provider == bedrock || -n $CW_OPENROUTER_API_KEY ]]; exit }
 
 if [[ $1 == --run ]]; then
@@ -127,6 +129,7 @@ base=$(git -C $repo rev-parse HEAD)
 # remote chore: no local branch, worktree or pane. cw-remote pushes base to cw/cw-<id>, runs the
 # worker on the sprite and refuses (never falls back here) when the remote path is broken.
 if [[ $launch == remote ]]; then
+  [[ $provider == bedrock ]] && die "remote chores run through the sprite's OpenRouter Connector; set provider to openrouter"
   cr=${CW_REMOTE:-$HOME/.local/bin/cw-remote}
   [[ -x $cr ]] || die "launch is remote but $cr is missing; start Claude Code once so the cheap-worker mod installs it"
   pf=$(mktemp ${TMPDIR:-/tmp}/cw-prompt.XXXXXX) || die "mktemp failed" 1
