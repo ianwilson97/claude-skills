@@ -96,6 +96,27 @@ check "bedrock run keeps user settings" '[[ -n $bchore && $bchore != *--setting-
 check "bedrock run passes the alias"    '[[ $bchore == *"${nl}--model${nl}opus${nl}--strict-mcp-config${nl}"* ]]'
 check "run without provider is openrouter" '[[ $chore == *"${nl}--model${nl}sonnet${nl}--setting-sources${nl}"* ]]'
 
+# launch: remote (a stub cw-remote logs its argv and the prompt file it was given)
+print -r -- '{"pluginConfigs":{"cheap-worker@inline":{"options":{"launch":"remote"}}}}' > $tmp/remote.json
+print -l -- '#!/bin/zsh' 'print -r -- "$*" > ${0:A:h}/remote.argv; cp $5 ${0:A:h}/remote.prompt' \
+  '[[ -n ${STUB_EXIT:-} ]] && { print -u2 "cw-remote: refused"; exit $STUB_EXIT }' \
+  'print "remote=mcp-cw-a-b branch=cw/$2 checkpoint=v7"; print "url=https://mcp-cw-a-b.sprites.app"' > $fake/cw-remote
+chmod +x $fake/cw-remote
+print -l -- '#!/bin/sh' "echo tmux-called >> $tmp/tmux.log; exit 1" > $fake/tmux
+rm -f $tmp/tmux.log
+r() { env -u CW_OPENROUTER_API_KEY PATH=$fake:$PATH CW_LAUNCH=remote CW_REMOTE=$fake/cw-remote zsh -f $cw "$@" }
+check "remote is read from settings"    '[[ $(CW_SETTINGS=$tmp/remote.json z chore 002-chore boss) == *"${nl}launch=remote${nl}"* ]]'
+rout=$(r chore 002-chore boss 2>/dev/null); rrc=$?
+check "remote chore exits 0 and names its branch" '(( rrc == 0 )) && [[ $rout == "remote cw/cw-002-chore${nl}url=https://mcp-cw-a-b.sprites.app" ]]'
+check "remote chore calls cw-remote launch" '[[ $(<$fake/remote.argv) == "launch cw-002-chore deepseek/deepseek-v4.1-flash $head "* ]]'
+check "remote prompt is the task body plus the report line" '[[ $(<$fake/remote.prompt) == "# Append the line"* && $(<$fake/remote.prompt) == *"your final [cw-done] commit message is your report; the driver reviews branch cw/cw-002-chore." ]]'
+check "remote prompt has no local-worker wiring" '[[ $(<$fake/remote.prompt) != *"SendMessage to"* && $(<$fake/remote.prompt) != *.driver-seat/results* && $(<$fake/remote.prompt) != *"Bash("* && $(<$fake/remote.prompt) != *"job: chore"* ]]'
+check "remote chore makes no local branch or worktree" '! git show-ref -q --verify refs/heads/cw/002-chore && [[ ! -e .driver-seat/wt/002-chore && ! -e $tmp/tmux.log ]]'
+check "remote refusal is not a local fallback" '[[ $(STUB_EXIT=2 st r chore 002-chore boss) == 2 && ! -e $tmp/tmux.log ]] && ! git show-ref -q --verify refs/heads/cw/002-chore'
+rerr=$(CW_LAUNCH=remote z research 001-res boss 2>&1 >/dev/null)
+check "research under remote runs locally" '[[ $(CW_LAUNCH=remote z research 001-res boss 2>/dev/null) == *"${nl}launch=panes${nl}"* && $rerr == *"cw: research runs locally; remote is for general workers"* ]]'
+check "remote without cw-remote refuses" '[[ $(st env -u CW_OPENROUTER_API_KEY PATH=$fake:$PATH CW_LAUNCH=remote CW_REMOTE=/nonexistent zsh -f $cw chore 002-chore boss) == 2 && ! -e $tmp/tmux.log ]]'
+
 if (( live )); then
   [[ -n ${CW_OPENROUTER_API_KEY:-} ]] || { print "live: CW_OPENROUTER_API_KEY is unset"; exit 1 }
   tmux has-session -t cw 2>/dev/null && { print "live: tmux session cw exists; close it first"; exit 1 }

@@ -12,6 +12,9 @@
 #   launch    panes       tiled in tmux session `cw`, window `workers` (default)
 #             tabs        a tmux session `cw-<id>` per worker, opened as a background cmux or
 #                         Ghostty tab; `crew <id>` attaches from any terminal
+#             remote      a chore runs on this repo's Fly Sprite through the mod's cw-remote
+#                         ($CW_REMOTE, default ~/.local/bin/cw-remote); its result is branch
+#                         cw/cw-<id> on origin. Research always runs locally (as panes).
 #
 # CW_DRY_RUN=1 validates and prints instead of touching git/tmux/claude (used by test-cw.sh).
 die() { print -u2 -- "cw: $1"; exit ${2:-2} }
@@ -24,7 +27,7 @@ setting() {
   done
 }
 provider=${CW_PROVIDER:-$(setting provider)}; [[ $provider == bedrock ]] || provider=openrouter
-launch=${CW_LAUNCH:-$(setting launch)}; [[ $launch == tabs ]] || launch=panes
+launch=${CW_LAUNCH:-$(setting launch)}; [[ $launch == (tabs|remote) ]] || launch=panes
 
 # ponytail: models are two variables, not a config file.
 if [[ $provider == bedrock ]]; then
@@ -50,7 +53,10 @@ fi
 
 [[ $job == (research|chore) ]] || die "job must be research or chore, got '$job'"
 [[ $id =~ '^[0-9]{3}-[a-z0-9-]+$' ]] || die "task id must look like 012-slug, got '$id'"
-[[ $provider == bedrock || -n $CW_OPENROUTER_API_KEY ]] || die "CW_OPENROUTER_API_KEY unset: cw is off on this machine"
+# remote is for general workers: research keeps its local, shell-less sandbox
+[[ $mode == launch && $launch == remote && $job == research ]] && { print -u2 -- "cw: research runs locally; remote is for general workers"; launch=panes }
+# a remote chore reaches models through the sprite's OpenRouter Connector, not this machine's key
+[[ $provider == bedrock || -n $CW_OPENROUTER_API_KEY || $launch == remote ]] || die "CW_OPENROUTER_API_KEY unset: cw is off on this machine"
 ds=$repo/.driver-seat
 task=$ds/tasks/$id.md
 [[ -f $task ]] || die "missing task file $task"
@@ -110,11 +116,32 @@ When done, SendMessage to $boss: \"done $id\" plus a summary of at most 5 lines.
 fi
 
 if [[ $job == chore ]]; then
-  git -C $repo show-ref --quiet --verify refs/heads/cw/$id && die "branch cw/$id already exists"
-  [[ -e $dir ]] && die "$dir already exists"
+  if [[ $launch != remote ]]; then
+    git -C $repo show-ref --quiet --verify refs/heads/cw/$id && die "branch cw/$id already exists"
+    [[ -e $dir ]] && die "$dir already exists"
+  fi
 fi
 base=$(git -C $repo rev-parse HEAD)
 [[ -n $CW_DRY_RUN ]] && { print -l -- "repo=$repo" "dir=$dir" "base=$base" "provider=$provider" "launch=$launch" "model=$model"; exit 0 }
+
+# remote chore: no local branch, worktree or pane. cw-remote pushes base to cw/cw-<id>, runs the
+# worker on the sprite and refuses (never falls back here) when the remote path is broken.
+if [[ $launch == remote ]]; then
+  cr=${CW_REMOTE:-$HOME/.local/bin/cw-remote}
+  [[ -x $cr ]] || die "launch is remote but $cr is missing; start Claude Code once so the cheap-worker mod installs it"
+  pf=$(mktemp ${TMPDIR:-/tmp}/cw-prompt.XXXXXX) || die "mktemp failed" 1
+  # the task file's body (frontmatter dropped), then how the result is reported
+  { awk 'NR == 1 && /^---$/ { fm = 1; next } fm && /^---$/ { fm = 0; next } !fm' $task
+    print
+    print -r -- "When done, your final [cw-done] commit message is your report; the driver reviews branch cw/cw-$id."
+  } > $pf
+  out=$(cd $repo && $cr launch cw-$id $model $base $pf); rc=$?
+  rm -f $pf
+  (( rc == 0 )) || exit $rc
+  print -r -- "remote cw/cw-$id"
+  print -r -- ${(M)${(f)out}:#url=*}
+  exit 0
+fi
 
 # from here on a failure undoes the chore's branch and worktree, so the relaunch starts clean
 fail() {

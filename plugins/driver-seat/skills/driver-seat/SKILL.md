@@ -125,6 +125,8 @@ Research and chores can run off-plan on a cheap pinned model, each as a fresh Cl
 
 Either way `crew NNN-slug` attaches to a worker from any terminal, and the mod's `/workers`, `/progress` and `/map` views list cw workers alongside its own.
 
+With **launch** `remote`, a chore runs on the repo's Fly Sprite (set up once with `/cheap-worker:remote-setup`) and needs no local key. `cw` prints `remote cw/cw-NNN-slug` and a `url=` line instead of a pane id. It sends no `done` message: notices go to the driver's phone, and the result is branch `cw/cw-NNN-slug` on origin, whose final `[cw-done]` commit message is the worker's report. When the driver says it's done, review it with `git fetch origin cw/cw-NNN-slug` and the usual review cycle. Skip step 3 of Dispatch for it. Exit 2 means `cw-remote` refused (its message names the fix): tell the driver, and never relaunch it locally unasked. Research always runs locally, whatever the switch says.
+
 **Dispatch.**
 1. Write `.driver-seat/tasks/NNN-slug.md` from the template below. The worker never sees this conversation: put every fact it needs under **Context**.
 2. Run `${CLAUDE_SKILL_DIR}/scripts/cw <research|chore> NNN-slug <your session name>`. Your name is the first line of `ListAgents`. Keep the pane id it prints. Exit 1 means the worker didn't start: log verdict `infra`, relaunch once, then do the task plan-side (see **Outcome**).
